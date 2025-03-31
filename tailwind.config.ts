@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,15 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Game-specific colors
+				atom: {
+					uranium235: '#8B5CF6',
+					uranium238: '#6366F1',
+					plutonium239: '#D946EF',
+					thorium232: '#3B82F6',
+					neutron: '#F97316',
+					energy: '#FCD34D'
 				}
 			},
 			borderRadius: {
@@ -84,11 +94,66 @@ export default {
 					to: {
 						height: '0'
 					}
-				}
+				},
+				'pulse-grow': {
+					'0%': {
+						transform: 'scale(1)',
+						opacity: '1'
+					},
+					'50%': {
+						transform: 'scale(1.2)',
+						opacity: '0.8'
+					},
+					'100%': {
+						transform: 'scale(1)',
+						opacity: '1'
+					}
+				},
+				'float': {
+					'0%, 100%': {
+						transform: 'translateY(0)'
+					},
+					'50%': {
+						transform: 'translateY(-10px)'
+					}
+				},
+				'explosion': {
+					'0%': {
+						transform: 'scale(0)',
+						opacity: '1'
+					},
+					'80%': {
+						transform: 'scale(1.5)',
+						opacity: '0.7'
+					},
+					'100%': {
+						transform: 'scale(2)',
+						opacity: '0'
+					}
+				},
+				'shoot': {
+					'0%': {
+						transform: 'translateX(0) translateY(0)',
+						opacity: '1'
+					},
+					'100%': {
+						transform: 'translateX(100px) translateY(-50px)',
+						opacity: '0.6'
+					}
+				},
+				'spin-slow': {
+                    '0%': { transform: 'rotate(0deg)' },
+                    '100%': { transform: 'rotate(360deg)' }
+                }
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-grow': 'pulse-grow 2s ease-in-out infinite',
+				'float': 'float 3s ease-in-out infinite',
+				'explosion': 'explosion 0.8s ease-out forwards',
+				'shoot': 'shoot 1s ease-out forwards',
+				'spin-slow': 'spin-slow 8s linear infinite'
 			}
 		}
 	},
