@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { AtomProps } from './Atom';
-import { Atom, Energy, Play, RefreshCw } from 'lucide-react';
+import { Atom, Zap, Play, RefreshCw } from 'lucide-react';
 
 interface GameControlsProps {
   onSelectElement: (element: AtomProps['element']) => void;
@@ -56,7 +56,7 @@ export const GameControls = ({
           disabled={!canFireNeutron}
           className="bg-orange-500 hover:bg-orange-600"
         >
-          <Energy className="mr-2 h-5 w-5" />
+          <Zap className="mr-2 h-5 w-5" />
           Neutron abschießen
         </Button>
         
