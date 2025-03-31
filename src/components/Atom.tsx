@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface AtomProps {
-  element: 'uranium235' | 'uranium238' | 'plutonium239' | 'thorium232';
+  element: 'uranium235' | 'uranium238' | 'plutonium239' | 'thorium232' | 'uranium239' | 'neptunium239';
   size?: 'sm' | 'md' | 'lg';
   onClick?: () => void;
   isActive?: boolean;
@@ -33,6 +33,22 @@ const elementData: Record<AtomProps['element'], ElementProperties> = {
     symbol: 'U-238',
     color: 'bg-atom-uranium238',
     protons: 92,
+    neutrons: 146,
+    canFission: false,
+  },
+  uranium239: {
+    name: 'Uran-239',
+    symbol: 'U-239',
+    color: 'bg-atom-uranium239',
+    protons: 92,
+    neutrons: 147,
+    canFission: false,
+  },
+  neptunium239: {
+    name: 'Neptunium-239',
+    symbol: 'Np-239',
+    color: 'bg-atom-neptunium239',
+    protons: 93,
     neutrons: 146,
     canFission: false,
   },

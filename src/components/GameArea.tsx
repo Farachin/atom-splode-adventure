@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Atom, { AtomProps } from './Atom';
@@ -7,6 +6,7 @@ import Effect from './Effect';
 import { toast } from '@/components/ui/use-toast';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
+import { Zap } from 'lucide-react';
 
 interface Position {
   x: number;
@@ -21,9 +21,10 @@ interface GameAreaProps {
 
 interface FissionEffect {
   id: string;
-  type: 'explosion' | 'neutron-release' | 'energy-release' | 'split-product';
+  type: 'explosion' | 'neutron-release' | 'energy-release' | 'split-product' | 'beta-decay' | 'neutron-absorption';
   position: Position;
   productType?: string;
+  targetPosition?: Position;
 }
 
 interface AtomicElement {
@@ -31,6 +32,9 @@ interface AtomicElement {
   type: string;
   id: string;
   isProduct?: boolean;
+  decayStage?: number;
+  decayTarget?: string;
+  decayDelay?: number;
 }
 
 interface NeutronObject {
@@ -50,10 +54,36 @@ const elementFissionProperties = {
   },
   uranium238: {
     canFission: false,
+    canAbsorb: true,
     energyReleased: 0,
     neutronReleased: 0,
-    probability: 0.05,
+    probability: 0.7,
     products: [],
+    transformTo: 'uranium239',
+  },
+  uranium239: {
+    canFission: false,
+    canAbsorb: false,
+    energyReleased: 0,
+    neutronReleased: 0,
+    probability: 0,
+    products: [],
+    isDecaying: true,
+    decayTo: 'neptunium239',
+    decayTime: 5000, // 5 seconds for demo purposes
+    decayType: 'beta',
+  },
+  neptunium239: {
+    canFission: false,
+    canAbsorb: false,
+    energyReleased: 0,
+    neutronReleased: 0,
+    probability: 0,
+    products: [],
+    isDecaying: true,
+    decayTo: 'plutonium239',
+    decayTime: 5000, // 5 seconds for demo
+    decayType: 'beta',
   },
   plutonium239: {
     canFission: true,
@@ -162,6 +192,28 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
     }
   }, [selectedElement]);
 
+  // Add a new effect for handling element decay
+  useEffect(() => {
+    const decayTimers: NodeJS.Timeout[] = [];
+    
+    elements.forEach(element => {
+      const elementType = element.type as keyof typeof elementFissionProperties;
+      const properties = elementFissionProperties[elementType];
+      
+      if (properties && properties.isDecaying) {
+        const timer = setTimeout(() => {
+          handleElementDecay(element);
+        }, properties.decayTime);
+        
+        decayTimers.push(timer);
+      }
+    });
+    
+    return () => {
+      decayTimers.forEach(timer => clearTimeout(timer));
+    };
+  }, [elements]);
+
   const handleAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!selectedElement) return;
     
@@ -245,6 +297,34 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
     
     // Remove the neutron used for this attempt
     setNeutrons(prev => prev.filter(n => n.id !== neutronId));
+    
+    if (fissionProperties.canAbsorb && fissionProperties.transformTo) {
+      // Handle neutron absorption (for U-238 → U-239)
+      setEffects(prev => [...prev, {
+        id: `absorption-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        type: 'neutron-absorption',
+        position: element.position
+      }]);
+      
+      // Replace the element with its transformed version
+      const transformedElement = {
+        ...element,
+        type: fissionProperties.transformTo,
+        decayStage: 0
+      };
+      
+      setElements(prev => 
+        prev.map(el => el.id === element.id ? transformedElement : el)
+      );
+      
+      toast({
+        title: "Neutronenabsorption",
+        description: `${elementType} hat ein Neutron absorbiert und wurde zu ${fissionProperties.transformTo}`,
+        duration: 3000,
+      });
+      
+      return;
+    }
     
     if (willFission && fissionProperties.canFission) {
       // Successful fission
@@ -332,6 +412,40 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
     }
   };
 
+  const handleElementDecay = (element: AtomicElement) => {
+    const elementType = element.type as keyof typeof elementFissionProperties;
+    const properties = elementFissionProperties[elementType];
+    
+    if (!properties || !properties.isDecaying || !properties.decayTo) return;
+    
+    // Create beta decay effect
+    setEffects(prev => [...prev, {
+      id: `decay-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      type: 'beta-decay',
+      position: element.position,
+      targetPosition: {
+        x: element.position.x + (Math.random() * 40 - 20),
+        y: element.position.y + (Math.random() * 40 - 20)
+      }
+    }]);
+    
+    // Transform the element to its decay product
+    const decayedElement = {
+      ...element,
+      type: properties.decayTo
+    };
+    
+    setElements(prev => 
+      prev.map(el => el.id === element.id ? decayedElement : el)
+    );
+    
+    toast({
+      title: "Beta-Zerfall",
+      description: `${elementType} hat sich durch Beta-Zerfall in ${properties.decayTo} umgewandelt.`,
+      duration: 3000,
+    });
+  };
+
   const fireNeutron = () => {
     if (neutrons.length === 0 || elements.length === 0) return;
     
@@ -389,6 +503,18 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
     }
   };
 
+  const getIsotopeLabel = (elementType: string) => {
+    switch(elementType) {
+      case 'uranium235': return 'U-235';
+      case 'uranium238': return 'U-238';
+      case 'uranium239': return 'U-239';
+      case 'neptunium239': return 'Np-239';
+      case 'plutonium239': return 'Pu-239';
+      case 'thorium232': return 'Th-232';
+      default: return elementType;
+    }
+  };
+
   return (
     <Card 
       ref={gameAreaRef}
@@ -419,6 +545,7 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
             </div>
           );
         } else {
+          const elementType = element.type as keyof typeof elementFissionProperties;
           return (
             <div
               key={element.id}
@@ -429,7 +556,15 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
                 zIndex: 10
               }}
             >
-              <Atom element={element.type as AtomProps['element']} size="lg" />
+              {['uranium239', 'neptunium239'].includes(elementType) ? (
+                <div className="relative">
+                  <div className={`bg-atom-${elementType || 'plutonium239'} w-24 h-24 rounded-full flex items-center justify-center text-white font-bold`}>
+                    {getIsotopeLabel(elementType)}
+                  </div>
+                </div>
+              ) : (
+                <Atom element={elementType as AtomProps['element']} size="lg" />
+              )}
             </div>
           );
         }
@@ -467,6 +602,7 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
           x={effect.position.x}
           y={effect.position.y}
           productType={effect.productType}
+          targetPosition={effect.targetPosition}
           onComplete={() => removeEffect(effect.id)}
         />
       ))}

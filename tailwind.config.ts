@@ -67,6 +67,8 @@ export default {
 				atom: {
 					uranium235: '#8B5CF6',
 					uranium238: '#6366F1',
+					uranium239: '#4F46E5', // Slightly different from U-238
+					neptunium239: '#7C3AED',
 					plutonium239: '#D946EF',
 					thorium232: '#3B82F6',
 					neutron: '#F97316',
@@ -137,7 +139,7 @@ export default {
 						opacity: '1'
 					},
 					'100%': {
-						transform: 'translateX(100px) translateY(-50px)',
+						transform: 'translateX(25px) translateY(25px)',
 						opacity: '0.6'
 					}
 				},

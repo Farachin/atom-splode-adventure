@@ -1,24 +1,28 @@
-
 import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Zap } from 'lucide-react';
 
 interface EffectProps {
-  type: 'explosion' | 'neutron-release' | 'energy-release' | 'split-product';
+  type: 'explosion' | 'neutron-release' | 'energy-release' | 'split-product' | 'beta-decay' | 'neutron-absorption';
   x: number;
   y: number;
   onComplete?: () => void;
   className?: string;
   productType?: string;
+  targetPosition?: {
+    x: number;
+    y: number;
+  };
 }
 
-export const Effect = ({ type, x, y, onComplete, className, productType }: EffectProps) => {
+export const Effect = ({ type, x, y, onComplete, className, productType, targetPosition }: EffectProps) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(false);
       if (onComplete) onComplete();
-    }, type === 'explosion' ? 800 : 500);
+    }, type === 'explosion' ? 800 : type === 'beta-decay' ? 1000 : 500);
 
     return () => clearTimeout(timer);
   }, [type, onComplete]);
@@ -124,6 +128,48 @@ export const Effect = ({ type, x, y, onComplete, className, productType }: Effec
           >
             {getProductLabel(productType)}
           </div>
+        );
+      case 'beta-decay':
+        return (
+          <div 
+            className={cn(
+              'absolute bg-blue-500 rounded-full animate-shoot',
+              className
+            )}
+            style={{ 
+              left: x - 3, 
+              top: y - 3, 
+              width: '6px', 
+              height: '6px',
+              zIndex: 30,
+              transformOrigin: 'center',
+              transform: targetPosition 
+                ? `translate(0, 0)`
+                : 'translate(0, 0)',
+              animation: targetPosition 
+                ? `shoot 1s ease-out forwards`
+                : 'pulse 1s infinite'
+            }}
+          >
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[8px] font-bold text-white">e-</div>
+          </div>
+        );
+      case 'neutron-absorption':
+        return (
+          <div 
+            className={cn(
+              'absolute rounded-full bg-gradient-to-r from-yellow-300 to-orange-500 animate-pulse',
+              className
+            )}
+            style={{ 
+              left: x - 15, 
+              top: y - 15, 
+              width: '30px', 
+              height: '30px',
+              zIndex: 30,
+              opacity: 0.7
+            }}
+          />
         );
       default:
         return null;
