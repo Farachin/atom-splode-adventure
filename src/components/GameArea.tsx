@@ -257,7 +257,7 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
       // Remove the element that was split
       setElements(prev => prev.filter(e => e.id !== element.id));
       
-      // Create split products
+      // Create split products and released neutrons
       setTimeout(() => {
         // Add split products
         if (fissionProperties.products.length > 0) {
@@ -278,7 +278,7 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
           setElements(prev => [...prev, ...newElements]);
         }
         
-        // Create new neutrons
+        // Create new neutrons - ensure ALL neutrons are visualized
         const newNeutrons: NeutronObject[] = [];
         for (let i = 0; i < fissionProperties.neutronReleased; i++) {
           const angle = (Math.PI * 2 / fissionProperties.neutronReleased) * i;
@@ -435,7 +435,7 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
         }
       })}
       
-      {/* Neutrons */}
+      {/* Neutrons - each with 'n' label */}
       {neutrons.map((neutron) => (
         <div
           key={neutron.id}

@@ -19,6 +19,12 @@ const sizeClasses = {
   lg: 'w-8 h-8',
 };
 
+const fontSizeClasses = {
+  sm: 'text-[8px]',
+  md: 'text-xs',
+  lg: 'text-sm',
+};
+
 export const Neutron = ({
   size = 'md',
   onClick,
@@ -45,8 +51,9 @@ export const Neutron = ({
   return (
     <div
       className={cn(
-        'neutron bg-atom-neutron rounded-full cursor-pointer hover:scale-110 transition-transform',
+        'neutron bg-atom-neutron rounded-full cursor-pointer hover:scale-110 transition-transform flex items-center justify-center',
         sizeClasses[size],
+        fontSizeClasses[size],
         isAnimating ? 'animate-pulse' : '',
         isDragging ? 'opacity-50' : '',
         className
@@ -61,7 +68,9 @@ export const Neutron = ({
       draggable={isDraggable}
       onDragStart={isDraggable ? handleDragStart : undefined}
       onDragEnd={isDraggable ? handleDragEnd : undefined}
-    />
+    >
+      <span className="font-bold text-white select-none">n</span>
+    </div>
   );
 };
 
