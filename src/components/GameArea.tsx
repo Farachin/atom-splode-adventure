@@ -21,8 +21,9 @@ interface GameAreaProps {
 
 interface FissionEffect {
   id: string;
-  type: 'explosion' | 'neutron-release' | 'energy-release';
+  type: 'explosion' | 'neutron-release' | 'energy-release' | 'split-product';
   position: Position;
+  productType?: string;
 }
 
 const elementFissionProperties = {
@@ -31,24 +32,28 @@ const elementFissionProperties = {
     energyReleased: 200,
     neutronReleased: 3,
     probability: 0.95,
+    products: ['barium', 'krypton'],
   },
   uranium238: {
     canFission: false,
     energyReleased: 0,
     neutronReleased: 0,
     probability: 0.05,
+    products: [],
   },
   plutonium239: {
     canFission: true,
     energyReleased: 210,
     neutronReleased: 3,
     probability: 0.9,
+    products: ['xenon', 'zirconium'],
   },
   thorium232: {
     canFission: false,
     energyReleased: 0,
     neutronReleased: 0,
     probability: 0.1,
+    products: [],
   },
 };
 
@@ -58,6 +63,7 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
   const [isNeutronMoving, setIsNeutronMoving] = useState(false);
   const [effects, setEffects] = useState<FissionEffect[]>([]);
   const [showAtom, setShowAtom] = useState(false);
+  const [splitProducts, setSplitProducts] = useState<{position: Position, type: string}[]>([]);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -70,8 +76,10 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
       setAtomPosition({ x: centerX, y: centerY });
       setNeutronPosition(null);
       setShowAtom(true);
+      setSplitProducts([]);
     } else {
       setShowAtom(false);
+      setSplitProducts([]);
     }
   }, [selectedElement]);
 
@@ -112,7 +120,28 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
           }
         ]);
         
+        // Show split products
+        setSplitProducts([]);
+        setShowAtom(false);
+        
         setTimeout(() => {
+          // Create split products
+          const newProducts = [];
+          if (fissionProperties.products.length > 0) {
+            for (let i = 0; i < fissionProperties.products.length; i++) {
+              const angle = (Math.PI / fissionProperties.products.length) * i;
+              const distance = 60;
+              newProducts.push({
+                position: {
+                  x: atomPosition.x + Math.cos(angle) * distance,
+                  y: atomPosition.y + Math.sin(angle) * distance
+                },
+                type: fissionProperties.products[i]
+              });
+            }
+            setSplitProducts(newProducts);
+          }
+          
           // Create neutron release effects
           const newEffects = [];
           for (let i = 0; i < fissionProperties.neutronReleased; i++) {
@@ -142,12 +171,27 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
             });
           }
           
+          // Add split product effects
+          fissionProperties.products.forEach((product, i) => {
+            const angle = (Math.PI / fissionProperties.products.length) * i;
+            const distance = 60;
+            newEffects.push({
+              id: `product-${Date.now()}-${i}`,
+              type: 'split-product',
+              position: {
+                x: atomPosition.x + Math.cos(angle) * distance,
+                y: atomPosition.y + Math.sin(angle) * distance
+              },
+              productType: product
+            });
+          });
+          
           setEffects(newEffects);
           onFission(fissionProperties.energyReleased, fissionProperties.neutronReleased);
           
           toast({
             title: "Kernspaltung!",
-            description: `${fissionProperties.energyReleased} MeV Energie und ${fissionProperties.neutronReleased} Neutronen freigesetzt!`,
+            description: `${fissionProperties.energyReleased} MeV Energie und ${fissionProperties.neutronReleased} Neutronen freigesetzt! Neue Elemente: ${fissionProperties.products.join(', ')}`,
             duration: 3000,
           });
         }, 800);
@@ -171,6 +215,26 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
     setEffects(effects.filter(effect => effect.id !== id));
   };
 
+  const getProductColor = (productType: string) => {
+    switch(productType) {
+      case 'barium': return 'bg-green-500';
+      case 'krypton': return 'bg-blue-500';
+      case 'xenon': return 'bg-purple-500';
+      case 'zirconium': return 'bg-yellow-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getProductLabel = (productType: string) => {
+    switch(productType) {
+      case 'barium': return 'Ba';
+      case 'krypton': return 'Kr';
+      case 'xenon': return 'Xe';
+      case 'zirconium': return 'Zr';
+      default: return '?';
+    }
+  };
+
   return (
     <Card 
       ref={gameAreaRef}
@@ -189,10 +253,26 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
         </div>
       )}
       
+      {splitProducts.map((product, index) => (
+        <div
+          key={`${product.type}-${index}`}
+          className={`absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center text-white font-bold animate-fade-in ${getProductColor(product.type)}`}
+          style={{ 
+            left: product.position.x, 
+            top: product.position.y,
+            width: '40px',
+            height: '40px'
+          }}
+        >
+          {getProductLabel(product.type)}
+        </div>
+      ))}
+      
       {neutronPosition && !isNeutronMoving && (
         <div
-          className="absolute transform -translate-x-1/2 -translate-y-1/2"
+          className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
           style={{ left: neutronPosition.x, top: neutronPosition.y }}
+          onClick={fireNeutron}
         >
           <Neutron 
             size="md" 
@@ -205,12 +285,12 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
         <div
           className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-1000"
           style={{ 
-            left: `${neutronPosition.x}px`, 
-            top: `${neutronPosition.y}px`,
-            transform: `translate(-50%, -50%) translateX(${(atomPosition.x - neutronPosition.x) * 0.8}px) translateY(${(atomPosition.y - neutronPosition.y) * 0.8}px)`
+            left: neutronPosition.x, 
+            top: neutronPosition.y,
+            transform: `translate(-50%, -50%) translateX(${atomPosition.x - neutronPosition.x}px) translateY(${atomPosition.y - neutronPosition.y}px)`
           }}
         >
-          <Neutron size="md" />
+          <Neutron size="md" isAnimating={true} />
         </div>
       )}
       
@@ -220,6 +300,7 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
           type={effect.type}
           x={effect.position.x}
           y={effect.position.y}
+          productType={effect.productType}
           onComplete={() => removeEffect(effect.id)}
         />
       ))}

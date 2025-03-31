@@ -24,9 +24,9 @@ export const Neutron = ({
   return (
     <div
       className={cn(
-        'neutron',
+        'neutron bg-atom-neutron rounded-full cursor-pointer hover:scale-110 transition-transform',
         sizeClasses[size],
-        isAnimating ? 'animate-shoot' : '',
+        isAnimating ? 'animate-pulse' : '',
         className
       )}
       onClick={onClick}

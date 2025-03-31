@@ -54,7 +54,7 @@ export const GameControls = ({
         <Button 
           onClick={onFireNeutron}
           disabled={!canFireNeutron}
-          className="bg-orange-500 hover:bg-orange-600"
+          className="bg-orange-500 hover:bg-orange-600 animate-pulse"
         >
           <Zap className="mr-2 h-5 w-5" />
           Neutron abschießen
