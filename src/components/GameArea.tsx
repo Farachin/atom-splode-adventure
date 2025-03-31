@@ -26,6 +26,20 @@ interface FissionEffect {
   productType?: string;
 }
 
+interface AtomicElement {
+  position: Position;
+  type: string;
+  id: string;
+  isProduct?: boolean;
+}
+
+interface NeutronObject {
+  id: string;
+  position: Position;
+  isMoving: boolean;
+  targetPosition?: Position;
+}
+
 const elementFissionProperties = {
   uranium235: {
     canFission: true,
@@ -55,15 +69,78 @@ const elementFissionProperties = {
     probability: 0.1,
     products: [],
   },
+  // Add fission properties for product elements
+  barium: {
+    canFission: true,
+    energyReleased: 50,
+    neutronReleased: 1,
+    probability: 0.7,
+    products: ['strontium', 'krypton'],
+  },
+  krypton: {
+    canFission: true,
+    energyReleased: 40,
+    neutronReleased: 1,
+    probability: 0.6,
+    products: ['selenium', 'germanium'],
+  },
+  xenon: {
+    canFission: true,
+    energyReleased: 60,
+    neutronReleased: 1,
+    probability: 0.65,
+    products: ['tellurium', 'zirconium'],
+  },
+  zirconium: {
+    canFission: true,
+    energyReleased: 45,
+    neutronReleased: 1,
+    probability: 0.55,
+    products: ['yttrium', 'strontium'],
+  },
+  // Secondary products (with lower energy and probability)
+  strontium: {
+    canFission: true,
+    energyReleased: 20,
+    neutronReleased: 1,
+    probability: 0.4,
+    products: ['krypton', 'germanium'],
+  },
+  selenium: {
+    canFission: false,
+    energyReleased: 10,
+    neutronReleased: 0,
+    probability: 0.2,
+    products: [],
+  },
+  germanium: {
+    canFission: false,
+    energyReleased: 10,
+    neutronReleased: 0,
+    probability: 0.2,
+    products: [],
+  },
+  tellurium: {
+    canFission: false,
+    energyReleased: 15,
+    neutronReleased: 0,
+    probability: 0.3,
+    products: [],
+  },
+  yttrium: {
+    canFission: false,
+    energyReleased: 15,
+    neutronReleased: 0,
+    probability: 0.3,
+    products: [],
+  },
 };
 
 export const GameArea = ({ selectedElement, onFission, className }: GameAreaProps) => {
-  const [atomPosition, setAtomPosition] = useState<Position | null>(null);
-  const [neutronPosition, setNeutronPosition] = useState<Position | null>(null);
-  const [isNeutronMoving, setIsNeutronMoving] = useState(false);
+  const [elements, setElements] = useState<AtomicElement[]>([]);
+  const [neutrons, setNeutrons] = useState<NeutronObject[]>([]);
   const [effects, setEffects] = useState<FissionEffect[]>([]);
-  const [showAtom, setShowAtom] = useState(false);
-  const [splitProducts, setSplitProducts] = useState<{position: Position, type: string}[]>([]);
+  const [draggingNeutronId, setDraggingNeutronId] = useState<string | null>(null);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -73,142 +150,209 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
       const centerX = area.clientWidth / 2;
       const centerY = area.clientHeight / 2;
       
-      setAtomPosition({ x: centerX, y: centerY });
-      setNeutronPosition(null);
-      setShowAtom(true);
-      setSplitProducts([]);
-    } else {
-      setShowAtom(false);
-      setSplitProducts([]);
+      // Clear existing elements and add new main element
+      setElements([{
+        id: `element-${Date.now()}`,
+        position: { x: centerX, y: centerY },
+        type: selectedElement,
+        isProduct: false
+      }]);
+      setNeutrons([]);
+      setEffects([]);
     }
   }, [selectedElement]);
 
   const handleAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!selectedElement || isNeutronMoving || !atomPosition) return;
+    if (!selectedElement) return;
     
     const rect = gameAreaRef.current?.getBoundingClientRect() || { left: 0, top: 0 };
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
     
-    // Don't place neutron on top of atom
-    const distanceToAtom = Math.sqrt(
-      Math.pow(clickX - atomPosition.x, 2) + Math.pow(clickY - atomPosition.y, 2)
-    );
+    // Don't place neutron on top of elements
+    const clickedOnElement = elements.some(element => {
+      const distance = Math.sqrt(
+        Math.pow(clickX - element.position.x, 2) + Math.pow(clickY - element.position.y, 2)
+      );
+      return distance < 40; // Approximate radius of atom
+    });
     
-    if (distanceToAtom < 50) return;
+    if (clickedOnElement) return;
     
-    setNeutronPosition({ x: clickX, y: clickY });
+    // Add a new neutron at the clicked position
+    const newNeutron = {
+      id: `neutron-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      position: { x: clickX, y: clickY },
+      isMoving: false
+    };
+    
+    setNeutrons(prev => [...prev, newNeutron]);
   };
 
-  const fireNeutron = () => {
-    if (!selectedElement || !atomPosition || !neutronPosition) return;
+  const handleNeutronDragStart = (id: string) => {
+    setDraggingNeutronId(id);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
     
-    setIsNeutronMoving(true);
+    if (!draggingNeutronId) return;
     
-    // Simulate neutron movement
-    setTimeout(() => {
-      const fissionProperties = elementFissionProperties[selectedElement];
-      const willFission = Math.random() < fissionProperties.probability;
+    const rect = gameAreaRef.current?.getBoundingClientRect() || { left: 0, top: 0 };
+    const dropX = e.clientX - rect.left;
+    const dropY = e.clientY - rect.top;
+    
+    // Find if dropped on an element
+    const targetElement = elements.find(element => {
+      const distance = Math.sqrt(
+        Math.pow(dropX - element.position.x, 2) + Math.pow(dropY - element.position.y, 2)
+      );
+      return distance < 40; // Approximate radius of atom
+    });
+    
+    if (targetElement) {
+      // Move neutron to the element and initiate fission process
+      setNeutrons(prev => prev.map(neutron => 
+        neutron.id === draggingNeutronId 
+          ? { ...neutron, isMoving: true, targetPosition: targetElement.position } 
+          : neutron
+      ));
       
-      if (willFission && fissionProperties.canFission) {
-        // Successful fission
-        setEffects([
-          {
-            id: `explosion-${Date.now()}`,
-            type: 'explosion',
-            position: atomPosition
-          }
-        ]);
-        
-        // Show split products
-        setSplitProducts([]);
-        setShowAtom(false);
-        
-        setTimeout(() => {
-          // Create split products
-          const newProducts = [];
-          if (fissionProperties.products.length > 0) {
-            for (let i = 0; i < fissionProperties.products.length; i++) {
-              const angle = (Math.PI / fissionProperties.products.length) * i;
-              const distance = 60;
-              newProducts.push({
-                position: {
-                  x: atomPosition.x + Math.cos(angle) * distance,
-                  y: atomPosition.y + Math.sin(angle) * distance
-                },
-                type: fissionProperties.products[i]
-              });
-            }
-            setSplitProducts(newProducts);
-          }
-          
-          // Create neutron release effects
-          const newEffects = [];
-          for (let i = 0; i < fissionProperties.neutronReleased; i++) {
-            const angle = (Math.PI * 2 / fissionProperties.neutronReleased) * i;
-            const distance = 40;
-            newEffects.push({
-              id: `neutron-${Date.now()}-${i}`,
-              type: 'neutron-release',
-              position: {
-                x: atomPosition.x + Math.cos(angle) * distance,
-                y: atomPosition.y + Math.sin(angle) * distance
-              }
-            });
-          }
-          
-          // Create energy release effects
-          for (let i = 0; i < 5; i++) {
-            const angle = (Math.PI * 2 / 5) * i;
-            const distance = 30;
-            newEffects.push({
-              id: `energy-${Date.now()}-${i}`,
-              type: 'energy-release',
-              position: {
-                x: atomPosition.x + Math.cos(angle) * distance,
-                y: atomPosition.y + Math.sin(angle) * distance
-              }
-            });
-          }
-          
-          // Add split product effects
+      // Schedule fission after animation
+      setTimeout(() => {
+        processElementFission(targetElement, draggingNeutronId!);
+      }, 500);
+    } else {
+      // Just move the neutron to the new position
+      setNeutrons(prev => prev.map(neutron => 
+        neutron.id === draggingNeutronId 
+          ? { ...neutron, position: { x: dropX, y: dropY }, isMoving: false, targetPosition: undefined } 
+          : neutron
+      ));
+    }
+    
+    setDraggingNeutronId(null);
+  };
+
+  const processElementFission = (element: AtomicElement, neutronId: string) => {
+    const elementType = element.type as keyof typeof elementFissionProperties;
+    const fissionProperties = elementFissionProperties[elementType];
+    const willFission = Math.random() < fissionProperties.probability;
+    
+    // Remove the neutron used for this attempt
+    setNeutrons(prev => prev.filter(n => n.id !== neutronId));
+    
+    if (willFission && fissionProperties.canFission) {
+      // Successful fission
+      setEffects(prev => [...prev, {
+        id: `explosion-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        type: 'explosion',
+        position: element.position
+      }]);
+      
+      // Remove the element that was split
+      setElements(prev => prev.filter(e => e.id !== element.id));
+      
+      // Create split products
+      setTimeout(() => {
+        // Add split products
+        if (fissionProperties.products.length > 0) {
+          const newElements: AtomicElement[] = [];
           fissionProperties.products.forEach((product, i) => {
             const angle = (Math.PI / fissionProperties.products.length) * i;
             const distance = 60;
-            newEffects.push({
-              id: `product-${Date.now()}-${i}`,
-              type: 'split-product',
+            newElements.push({
+              id: `element-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`,
               position: {
-                x: atomPosition.x + Math.cos(angle) * distance,
-                y: atomPosition.y + Math.sin(angle) * distance
+                x: element.position.x + Math.cos(angle) * distance,
+                y: element.position.y + Math.sin(angle) * distance
               },
-              productType: product
+              type: product,
+              isProduct: true
             });
           });
-          
-          setEffects(newEffects);
-          onFission(fissionProperties.energyReleased, fissionProperties.neutronReleased);
-          
-          toast({
-            title: "Kernspaltung!",
-            description: `${fissionProperties.energyReleased} MeV Energie und ${fissionProperties.neutronReleased} Neutronen freigesetzt! Neue Elemente: ${fissionProperties.products.join(', ')}`,
-            duration: 3000,
+          setElements(prev => [...prev, ...newElements]);
+        }
+        
+        // Create new neutrons
+        const newNeutrons: NeutronObject[] = [];
+        for (let i = 0; i < fissionProperties.neutronReleased; i++) {
+          const angle = (Math.PI * 2 / fissionProperties.neutronReleased) * i;
+          const distance = 80;
+          newNeutrons.push({
+            id: `neutron-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`,
+            position: {
+              x: element.position.x + Math.cos(angle) * distance,
+              y: element.position.y + Math.sin(angle) * distance
+            },
+            isMoving: false
           });
-        }, 800);
-      } else {
-        // Failed fission
+        }
+        setNeutrons(prev => [...prev, ...newNeutrons]);
+        
+        // Add visual effects
+        const newEffects: FissionEffect[] = [];
+        // Energy release effects
+        for (let i = 0; i < 5; i++) {
+          const angle = (Math.PI * 2 / 5) * i;
+          const distance = 30;
+          newEffects.push({
+            id: `energy-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`,
+            type: 'energy-release',
+            position: {
+              x: element.position.x + Math.cos(angle) * distance,
+              y: element.position.y + Math.sin(angle) * distance
+            }
+          });
+        }
+        setEffects(prev => [...prev, ...newEffects]);
+        
+        // Notify about fission event
+        onFission(fissionProperties.energyReleased, fissionProperties.neutronReleased);
+        
         toast({
-          title: "Keine Kernspaltung",
-          description: selectedElement === 'uranium238' || selectedElement === 'thorium232' 
-            ? "Dieses Isotop ist nicht gut spaltbar." 
-            : "Das Neutron hat den Kern nicht richtig getroffen.",
+          title: "Kernspaltung!",
+          description: `${fissionProperties.energyReleased} MeV Energie und ${fissionProperties.neutronReleased} Neutronen freigesetzt! Neue Elemente: ${fissionProperties.products.join(', ')}`,
           duration: 3000,
         });
-      }
-      
-      setIsNeutronMoving(false);
-      setNeutronPosition(null);
-    }, 1000);
+      }, 800);
+    } else {
+      // Failed fission
+      toast({
+        title: "Keine Kernspaltung",
+        description: !fissionProperties.canFission
+          ? `${elementType} ist nicht gut spaltbar.`
+          : "Das Neutron hat den Kern nicht richtig getroffen.",
+        duration: 3000,
+      });
+    }
+  };
+
+  const fireNeutron = () => {
+    if (neutrons.length === 0 || elements.length === 0) return;
+    
+    // Find the first non-moving neutron
+    const neutronToFire = neutrons.find(n => !n.isMoving);
+    if (!neutronToFire) return;
+    
+    // Find the first element to target
+    const targetElement = elements[0];
+    
+    // Set neutron to move towards the element
+    setNeutrons(prev => prev.map(neutron => 
+      neutron.id === neutronToFire.id 
+        ? { ...neutron, isMoving: true, targetPosition: targetElement.position } 
+        : neutron
+    ));
+    
+    // Schedule fission after animation
+    setTimeout(() => {
+      processElementFission(targetElement, neutronToFire.id);
+    }, 500);
   };
 
   const removeEffect = (id: string) => {
@@ -221,6 +365,11 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
       case 'krypton': return 'bg-blue-500';
       case 'xenon': return 'bg-purple-500';
       case 'zirconium': return 'bg-yellow-500';
+      case 'strontium': return 'bg-red-500';
+      case 'selenium': return 'bg-orange-500';
+      case 'germanium': return 'bg-pink-500';
+      case 'tellurium': return 'bg-cyan-500';
+      case 'yttrium': return 'bg-indigo-500';
       default: return 'bg-gray-500';
     }
   };
@@ -231,6 +380,11 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
       case 'krypton': return 'Kr';
       case 'xenon': return 'Xe';
       case 'zirconium': return 'Zr';
+      case 'strontium': return 'Sr';
+      case 'selenium': return 'Se';
+      case 'germanium': return 'Ge';
+      case 'tellurium': return 'Te';
+      case 'yttrium': return 'Y';
       default: return '?';
     }
   };
@@ -243,57 +397,69 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
         className
       )}
       onClick={handleAreaClick}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
-      {showAtom && selectedElement && atomPosition && (
+      {/* Main Elements and Fission Products */}
+      {elements.map((element) => {
+        if (element.isProduct) {
+          return (
+            <div
+              key={element.id}
+              className={`absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center text-white font-bold ${getProductColor(element.type)}`}
+              style={{ 
+                left: element.position.x, 
+                top: element.position.y,
+                width: '40px',
+                height: '40px',
+                zIndex: 10
+              }}
+            >
+              {getProductLabel(element.type)}
+            </div>
+          );
+        } else {
+          return (
+            <div
+              key={element.id}
+              className="absolute transform -translate-x-1/2 -translate-y-1/2"
+              style={{ 
+                left: element.position.x, 
+                top: element.position.y,
+                zIndex: 10
+              }}
+            >
+              <Atom element={element.type as AtomProps['element']} size="lg" />
+            </div>
+          );
+        }
+      })}
+      
+      {/* Neutrons */}
+      {neutrons.map((neutron) => (
         <div
+          key={neutron.id}
           className="absolute transform -translate-x-1/2 -translate-y-1/2"
-          style={{ left: atomPosition.x, top: atomPosition.y }}
-        >
-          <Atom element={selectedElement} size="lg" />
-        </div>
-      )}
-      
-      {splitProducts.map((product, index) => (
-        <div
-          key={`${product.type}-${index}`}
-          className={`absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center text-white font-bold animate-fade-in ${getProductColor(product.type)}`}
           style={{ 
-            left: product.position.x, 
-            top: product.position.y,
-            width: '40px',
-            height: '40px'
+            left: neutron.position.x, 
+            top: neutron.position.y,
+            transform: neutron.isMoving && neutron.targetPosition 
+              ? `translate(-50%, -50%) translateX(${neutron.targetPosition.x - neutron.position.x}px) translateY(${neutron.targetPosition.y - neutron.position.y}px)` 
+              : 'translate(-50%, -50%)',
+            transition: neutron.isMoving ? 'transform 0.5s ease-in-out' : 'none',
+            zIndex: 20
           }}
-        >
-          {getProductLabel(product.type)}
-        </div>
-      ))}
-      
-      {neutronPosition && !isNeutronMoving && (
-        <div
-          className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
-          style={{ left: neutronPosition.x, top: neutronPosition.y }}
-          onClick={fireNeutron}
         >
           <Neutron 
             size="md" 
-            onClick={fireNeutron} 
+            isAnimating={neutron.isMoving}
+            isDraggable={!neutron.isMoving}
+            onDragStart={() => handleNeutronDragStart(neutron.id)}
           />
         </div>
-      )}
+      ))}
       
-      {neutronPosition && isNeutronMoving && atomPosition && (
-        <div
-          className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-1000"
-          style={{ 
-            left: neutronPosition.x, 
-            top: neutronPosition.y,
-            transform: `translate(-50%, -50%) translateX(${atomPosition.x - neutronPosition.x}px) translateY(${atomPosition.y - neutronPosition.y}px)`
-          }}
-        >
-          <Neutron size="md" isAnimating={true} />
-        </div>
-      )}
-      
+      {/* Visual Effects */}
       {effects.map(effect => (
         <Effect
           key={effect.id}
@@ -305,7 +471,8 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
         />
       ))}
       
-      {!selectedElement && (
+      {/* Empty state message */}
+      {elements.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
           <p className="text-lg font-medium text-gray-500">
             Wähle ein Element aus, um zu beginnen

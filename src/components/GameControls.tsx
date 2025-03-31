@@ -68,6 +68,12 @@ export const GameControls = ({
           Zurücksetzen
         </Button>
       </div>
+      
+      <div className="text-center mt-2">
+        <p className="text-sm text-gray-500">
+          Tipp: Klicke in der Spielfläche, um Neutronen zu platzieren. Ziehe Neutronen per Drag & Drop auf Elemente.
+        </p>
+      </div>
     </div>
   );
 };

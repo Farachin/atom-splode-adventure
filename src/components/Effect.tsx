@@ -32,6 +32,11 @@ export const Effect = ({ type, x, y, onComplete, className, productType }: Effec
       case 'krypton': return 'bg-blue-500';
       case 'xenon': return 'bg-purple-500';
       case 'zirconium': return 'bg-yellow-500';
+      case 'strontium': return 'bg-red-500';
+      case 'selenium': return 'bg-orange-500';
+      case 'germanium': return 'bg-pink-500';
+      case 'tellurium': return 'bg-cyan-500';
+      case 'yttrium': return 'bg-indigo-500';
       default: return 'bg-gray-500';
     }
   };
@@ -43,6 +48,11 @@ export const Effect = ({ type, x, y, onComplete, className, productType }: Effec
       case 'krypton': return 'Kr';
       case 'xenon': return 'Xe';
       case 'zirconium': return 'Zr';
+      case 'strontium': return 'Sr';
+      case 'selenium': return 'Se';
+      case 'germanium': return 'Ge';
+      case 'tellurium': return 'Te';
+      case 'yttrium': return 'Y';
       default: return '?';
     }
   };
@@ -61,6 +71,7 @@ export const Effect = ({ type, x, y, onComplete, className, productType }: Effec
               top: y - 25, 
               width: '50px', 
               height: '50px',
+              zIndex: 30
             }}
           />
         );
@@ -76,6 +87,7 @@ export const Effect = ({ type, x, y, onComplete, className, productType }: Effec
               top: y - 4, 
               width: '8px', 
               height: '8px',
+              zIndex: 30
             }}
           />
         );
@@ -91,6 +103,7 @@ export const Effect = ({ type, x, y, onComplete, className, productType }: Effec
               top: y - 6, 
               width: '12px', 
               height: '12px',
+              zIndex: 30
             }}
           />
         );
@@ -106,6 +119,7 @@ export const Effect = ({ type, x, y, onComplete, className, productType }: Effec
               top: y - 20, 
               width: '40px', 
               height: '40px',
+              zIndex: 30
             }}
           >
             {getProductLabel(productType)}
