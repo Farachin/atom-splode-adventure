@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,7 @@ interface BombLabProps {
   uranium235Enrichment: number;
   availablePlutonium239: number;
   totalEnergy: number;
-  onDetonation: (yield: number, type: string) => void;
+  onDetonation: (yieldValue: number, type: string) => void;
   className?: string;
 }
 
@@ -35,7 +34,6 @@ export const BombLab = ({
   const [yieldEstimate, setYieldEstimate] = useState(0);
   const { toast } = useToast();
 
-  // Critical masses required for different bomb types
   const criticalMasses = {
     uranium: {
       gun: 56, // kg for gun-type uranium bomb
@@ -46,18 +44,14 @@ export const BombLab = ({
     }
   };
 
-  // Update design type when bomb type changes
   useEffect(() => {
     if (bombType === 'plutonium') {
-      // Plutonium can only use implosion design
       setDesignType('implosion');
     }
   }, [bombType]);
 
-  // Calculate if bomb can be built based on available materials
   const calculateBuildability = () => {
     if (bombType === 'uranium') {
-      // Check if uranium enrichment is sufficient
       if (uranium235Enrichment < 90) {
         return {
           canBuild: false,
@@ -65,7 +59,6 @@ export const BombLab = ({
         };
       }
       
-      // Check if enough uranium is available
       const requiredMass = criticalMasses.uranium[designType];
       if (availableUranium235 < requiredMass) {
         return {
@@ -74,7 +67,6 @@ export const BombLab = ({
         };
       }
     } else {
-      // Plutonium bomb
       if (availablePlutonium239 < criticalMasses.plutonium.implosion) {
         return {
           canBuild: false,
@@ -83,7 +75,6 @@ export const BombLab = ({
       }
     }
     
-    // Check if enough energy has been produced
     if (totalEnergy < 500) {
       return {
         canBuild: false,
@@ -96,32 +87,26 @@ export const BombLab = ({
 
   const buildability = calculateBuildability();
 
-  // Calculate estimated yield
   useEffect(() => {
     let estimatedYield = 0;
     
     if (bombType === 'uranium') {
-      // Uranium bomb yields roughly 2 kilotons per kg over critical mass
       const criticalMass = criticalMasses.uranium[designType];
       const excessMass = Math.max(0, availableUranium235 - criticalMass);
       
-      // Base yield + yield from excess material
       estimatedYield = 15 + (excessMass * 2);
       
-      // Gun design is less efficient
       if (designType === 'gun') {
         estimatedYield *= 0.7;
       }
     } else {
-      // Plutonium bomb
       const criticalMass = criticalMasses.plutonium.implosion;
       const excessMass = Math.max(0, availablePlutonium239 - criticalMass);
       
-      // Plutonium is more efficient
       estimatedYield = 20 + (excessMass * 3);
     }
     
-    setYieldEstimate(Math.min(100, estimatedYield)); // Cap at 100 kilotons for game purposes
+    setYieldEstimate(Math.min(100, estimatedYield));
   }, [bombType, designType, availableUranium235, availablePlutonium239]);
 
   const handleArm = () => {
@@ -140,7 +125,6 @@ export const BombLab = ({
   const handleDetonate = () => {
     if (!isArmed || !buildability.canBuild) return;
     
-    // Start countdown
     setCountdown(5);
     
     const countdownInterval = setInterval(() => {
@@ -158,7 +142,6 @@ export const BombLab = ({
   const startDetonation = () => {
     setIsDetonating(true);
     
-    // Simulation of nuclear explosion
     const explosionInterval = setInterval(() => {
       setDetonationProgress(prev => {
         if (prev >= 100) {
@@ -172,13 +155,11 @@ export const BombLab = ({
   };
 
   const completeDetonation = () => {
-    // Trigger the explosion effect in parent component
     onDetonation(
       yieldEstimate, 
       `${bombType === 'uranium' ? 'Uran' : 'Plutonium'}-${designType === 'gun' ? 'Kanonen' : 'Implosions'}`
     );
     
-    // Reset after some time
     setTimeout(() => {
       setIsDetonating(false);
       setIsArmed(false);
@@ -206,7 +187,6 @@ export const BombLab = ({
           )}
         </div>
         
-        {/* Bomb Configuration */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
             <div>
@@ -314,14 +294,12 @@ export const BombLab = ({
               </div>
             )}
             
-            {/* Countdown display */}
             {countdown > 0 && (
               <div className="bg-red-100 p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center">
                 <span className="text-3xl font-bold text-red-600">{countdown}</span>
               </div>
             )}
             
-            {/* Detonation progress */}
             {isDetonating && (
               <div className="space-y-2">
                 <h4 className="text-sm font-medium">Kernspaltung läuft:</h4>
@@ -350,7 +328,6 @@ export const BombLab = ({
           </div>
         </div>
         
-        {/* Control Buttons */}
         <div className="flex justify-center space-x-4">
           <Button 
             onClick={handleArm}
@@ -376,7 +353,6 @@ export const BombLab = ({
         </div>
       </div>
       
-      {/* Radiation symbol background */}
       <div className="absolute -bottom-8 -right-8 opacity-5 pointer-events-none">
         <Radiation className="w-32 h-32" />
       </div>

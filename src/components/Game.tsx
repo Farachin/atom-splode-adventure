@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import GameArea from './GameArea';
@@ -67,9 +66,7 @@ export const Game = ({ className }: GameProps) => {
     setCanFireNeutron(!!selectedElement && neutronCount > 0);
   }, [selectedElement, neutronCount]);
 
-  // Handle plutonium production from U-239 decay
   useEffect(() => {
-    // This would be triggered when a U-239 → Np-239 → Pu-239 decay chain completes
     const checkPlutoniumProduction = () => {
       // Simulation of plutonium production is already handled in the GameArea component
       // This is just a placeholder for any additional game logic
@@ -87,7 +84,6 @@ export const Game = ({ className }: GameProps) => {
     setTotalEnergy(prev => Math.min(MAX_ENERGY, prev + energy));
     setNeutronCount(prev => prev + neutrons - 1); // -1 because we used one
     
-    // Add small chance of plutonium production when fissioning U-238
     if (selectedElement === 'uranium238' && Math.random() < 0.1) {
       const newPlutonium = 0.01; // Small amount
       setPlutoniumAmount(prev => prev + newPlutonium);
@@ -126,12 +122,11 @@ export const Game = ({ className }: GameProps) => {
     });
   };
   
-  const handleDetonation = (yield_: number, type: string) => {
+  const handleDetonation = (yieldValue: number, type: string) => {
     setShowExplosion(true);
-    setExplosionYield(yield_);
+    setExplosionYield(yieldValue);
     setBombType(type);
     
-    // Consume materials
     if (type.includes('Uran')) {
       setEnrichedUranium(0);
     } else {
@@ -273,7 +268,6 @@ export const Game = ({ className }: GameProps) => {
         </TabsContent>
       </Tabs>
       
-      {/* Toggle for advanced labs */}
       <div className="flex justify-center">
         <Button
           variant="ghost" 
@@ -295,7 +289,6 @@ export const Game = ({ className }: GameProps) => {
         </Button>
       </div>
       
-      {/* Nuclear explosion effect */}
       {showExplosion && (
         <NuclearExplosion 
           isActive={showExplosion}
