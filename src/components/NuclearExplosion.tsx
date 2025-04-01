@@ -92,7 +92,7 @@ export const NuclearExplosion = ({ isActive, yield: explosionYield, onComplete, 
       {phase === 'fireball' && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
           <div 
-            className="rounded-full bg-yellow-500 animate-pulse-grow"
+            className="rounded-full bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 animate-pulse-grow"
             style={{ 
               width: `${100 * yieldFactor}px`, 
               height: `${100 * yieldFactor}px`,
@@ -107,40 +107,79 @@ export const NuclearExplosion = ({ isActive, yield: explosionYield, onComplete, 
       {/* Mushroom cloud */}
       {phase === 'mushroom' && (
         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-          {/* Stem */}
+          {/* Cloud cap top */}
           <div 
-            className="bg-gray-300 rounded-lg"
+            className="rounded-full bg-white -mb-8 z-30"
             style={{ 
-              width: `${30 * yieldFactor}px`, 
-              height: `${200 * yieldFactor}px`,
-              backgroundColor: 'rgba(209, 213, 219, 0.8)',
-              transition: 'height 3s ease-out',
+              width: `${220 * yieldFactor}px`, 
+              height: `${100 * yieldFactor}px`,
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              boxShadow: 'inset 0 -5px 15px rgba(0,0,0,0.1)',
+              transition: 'all 3s ease-out',
             }}
           ></div>
           
-          {/* Cloud top */}
+          {/* Cloud cap middle */}
           <div 
-            className="rounded-full bg-gray-200 -mt-10 z-10"
+            className="rounded-full bg-gray-200 -mb-5 z-20"
             style={{ 
-              width: `${150 * yieldFactor}px`, 
-              height: `${100 * yieldFactor}px`,
+              width: `${180 * yieldFactor}px`, 
+              height: `${120 * yieldFactor}px`,
               backgroundColor: 'rgba(229, 231, 235, 0.9)',
               boxShadow: 'inset 0 -10px 20px rgba(0,0,0,0.2)',
               transition: 'all 3s ease-out',
             }}
           ></div>
           
-          {/* Cloud cap */}
+          {/* Cloud cap bottom */}
           <div 
-            className="rounded-full bg-white -mt-20 z-20"
+            className="rounded-full bg-gray-300 z-10"
             style={{ 
-              width: `${200 * yieldFactor}px`, 
-              height: `${80 * yieldFactor}px`,
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              boxShadow: 'inset 0 -5px 15px rgba(0,0,0,0.1)',
+              width: `${150 * yieldFactor}px`, 
+              height: `${100 * yieldFactor}px`,
+              backgroundColor: 'rgba(209, 213, 219, 0.8)',
+              boxShadow: 'inset 0 -10px 20px rgba(0,0,0,0.3)',
               transition: 'all 3s ease-out',
             }}
           ></div>
+          
+          {/* Stem */}
+          <div 
+            className="bg-gradient-to-b from-gray-300 to-gray-400 rounded-lg"
+            style={{ 
+              width: `${30 * yieldFactor}px`, 
+              height: `${200 * yieldFactor}px`,
+              transition: 'height 3s ease-out',
+            }}
+          ></div>
+          
+          {/* Base fireball */}
+          <div
+            className="rounded-full bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 -mt-4"
+            style={{
+              width: `${60 * yieldFactor}px`,
+              height: `${60 * yieldFactor}px`,
+              transition: 'all 3s ease-out',
+            }}
+          ></div>
+          
+          {/* Fire at base */}
+          <div className="relative -mt-8">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute bg-orange-500 rounded-full animate-pulse"
+                style={{
+                  width: `${10 * yieldFactor}px`,
+                  height: `${20 * yieldFactor}px`,
+                  left: `${(i - 2) * 15 * yieldFactor}px`,
+                  bottom: `${Math.random() * 10}px`,
+                  animationDelay: `${i * 0.2}s`,
+                  opacity: 0.8,
+                }}
+              ></div>
+            ))}
+          </div>
         </div>
       )}
       
@@ -162,7 +201,7 @@ export const NuclearExplosion = ({ isActive, yield: explosionYield, onComplete, 
       {/* Aftermath glow */}
       {phase === 'aftermath' && (
         <div 
-          className="absolute inset-0 bg-orange-100"
+          className="absolute inset-0 bg-gradient-to-b from-orange-100 to-red-100"
           style={{ 
             opacity: Math.max(0, 0.5 - animationProgress / 200),
             transition: 'opacity 3s ease-out',

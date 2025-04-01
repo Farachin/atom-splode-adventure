@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -167,6 +168,64 @@ export const BombLab = ({
     }, 3000);
   };
 
+  // Visual representation of the bomb based on type and design
+  const renderBombVisual = () => {
+    if (bombType === 'uranium' && designType === 'gun') {
+      return (
+        <div className="flex flex-col items-center mt-2">
+          <div className="w-64 h-24 bg-gray-800 rounded-lg relative overflow-hidden">
+            {/* Gun-type diagram */}
+            <div className="absolute w-8 h-8 bg-yellow-500 rounded-full top-8 left-6"></div>
+            <div className="absolute w-10 h-10 bg-yellow-500 rounded-full top-7 right-6"></div>
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-6 bg-gray-600 rounded"></div>
+            <div className="absolute left-14 top-8 w-6 h-8 bg-gray-700 rounded"></div>
+            
+            {isArmed && (
+              <div className="absolute top-2 right-2 w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+            )}
+          </div>
+          <div className="text-xs mt-1 text-center">Kanonen-Design (Little Boy)</div>
+        </div>
+      );
+    } else if (bombType === 'uranium' && designType === 'implosion') {
+      return (
+        <div className="flex flex-col items-center mt-2">
+          <div className="w-40 h-40 bg-gray-800 rounded-full relative overflow-hidden">
+            {/* Implosion-type diagram */}
+            <div className="absolute w-20 h-20 bg-yellow-500 rounded-full top-10 left-10"></div>
+            <div className="absolute inset-0 border-8 border-dashed border-gray-600 rounded-full"></div>
+            <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
+              <div className="w-6 h-6 bg-red-500 rounded-full"></div>
+            </div>
+            
+            {isArmed && (
+              <div className="absolute top-2 right-2 w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+            )}
+          </div>
+          <div className="text-xs mt-1 text-center">Implosions-Design (Fat Man)</div>
+        </div>
+      );
+    } else if (bombType === 'plutonium') {
+      return (
+        <div className="flex flex-col items-center mt-2">
+          <div className="w-40 h-40 bg-gray-800 rounded-full relative overflow-hidden">
+            {/* Plutonium implosion-type diagram */}
+            <div className="absolute w-20 h-20 bg-purple-500 rounded-full top-10 left-10"></div>
+            <div className="absolute inset-0 border-8 border-dashed border-gray-600 rounded-full"></div>
+            <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
+              <div className="w-6 h-6 bg-red-500 rounded-full"></div>
+            </div>
+            
+            {isArmed && (
+              <div className="absolute top-2 right-2 w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+            )}
+          </div>
+          <div className="text-xs mt-1 text-center">Plutonium-Implosions-Design</div>
+        </div>
+      );
+    }
+  };
+
   return (
     <Card className={cn(
       'p-4 relative overflow-hidden',
@@ -199,6 +258,7 @@ export const BombLab = ({
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="uranium" id="uranium" />
                   <Label htmlFor="uranium" className="flex items-center">
+                    <div className="w-4 h-4 bg-yellow-500 rounded-full mr-2"></div>
                     <span className="mr-2">Uran-235</span>
                     <span className="text-xs text-gray-500">
                       ({availableUranium235.toFixed(1)} kg, {uranium235Enrichment.toFixed(1)}% angereichert)
@@ -208,6 +268,7 @@ export const BombLab = ({
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="plutonium" id="plutonium" />
                   <Label htmlFor="plutonium" className="flex items-center">
+                    <div className="w-4 h-4 bg-purple-500 rounded-full mr-2"></div>
                     <span className="mr-2">Plutonium-239</span>
                     <span className="text-xs text-gray-500">
                       ({availablePlutonium239.toFixed(1)} kg)
@@ -227,15 +288,26 @@ export const BombLab = ({
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="gun" id="gun" disabled={bombType === 'plutonium'} />
                   <Label htmlFor="gun" className={cn(bombType === 'plutonium' ? "text-gray-400" : "")}>
-                    <span className="mr-2">Kanonendesign</span>
-                    <span className="text-xs text-gray-500">(nur für Uran-235)</span>
+                    <div className="flex items-center">
+                      <div className="w-6 h-4 bg-gray-700 rounded mr-2 flex items-center justify-between px-1">
+                        <div className="w-1 h-2 bg-yellow-500"></div>
+                        <div className="w-1 h-2 bg-yellow-500"></div>
+                      </div>
+                      <span className="mr-2">Kanonendesign</span>
+                      <span className="text-xs text-gray-500">(nur für Uran-235)</span>
+                    </div>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="implosion" id="implosion" />
                   <Label htmlFor="implosion">
-                    <span className="mr-2">Implosionsdesign</span>
-                    <span className="text-xs text-gray-500">(effizienter)</span>
+                    <div className="flex items-center">
+                      <div className="w-5 h-5 bg-gray-700 rounded-full mr-2 flex items-center justify-center">
+                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                      </div>
+                      <span className="mr-2">Implosionsdesign</span>
+                      <span className="text-xs text-gray-500">(effizienter)</span>
+                    </div>
                   </Label>
                 </div>
               </RadioGroup>
@@ -243,7 +315,11 @@ export const BombLab = ({
             
             <div>
               <h4 className="text-sm font-medium">Kritische Masse benötigt:</h4>
-              <div className="text-sm">
+              <div className="text-sm flex items-center">
+                <div className={cn(
+                  "w-4 h-4 rounded-full mr-2",
+                  bombType === 'uranium' ? "bg-yellow-500" : "bg-purple-500"
+                )}></div>
                 {bombType === 'uranium' ? 
                   `${criticalMasses.uranium[designType]} kg U-235` : 
                   `${criticalMasses.plutonium.implosion} kg Pu-239`
@@ -259,6 +335,9 @@ export const BombLab = ({
               />
               <div className="text-sm mt-1">{totalEnergy} / 1000 MeV</div>
             </div>
+
+            {/* Visual bomb representation */}
+            {renderBombVisual()}
           </div>
           
           <div className="space-y-4">
@@ -333,7 +412,7 @@ export const BombLab = ({
             onClick={handleArm}
             disabled={!buildability.canBuild || isDetonating}
             className={cn(
-              "w-32",
+              "w-32 h-12 text-lg font-bold rounded-full",
               isArmed ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-500 hover:bg-blue-600"
             )}
           >
@@ -343,7 +422,7 @@ export const BombLab = ({
           <Button 
             onClick={handleDetonate}
             disabled={!isArmed || isDetonating || countdown > 0}
-            className="w-32 bg-red-600 hover:bg-red-700 relative overflow-hidden"
+            className="w-32 h-12 text-lg font-bold rounded-full bg-red-600 hover:bg-red-700 relative overflow-hidden"
           >
             <span className="relative z-10">Detonieren</span>
             {isArmed && (

@@ -150,6 +150,48 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
     return feedAmount * outputPercentage * instabilityFactor;
   };
 
+  // Helper function to generate multiple centrifuges
+  const renderCentrifuges = () => {
+    const centrifuges = [];
+    for (let i = 0; i < Math.min(centrifugeCount, 5); i++) {
+      centrifuges.push(
+        <div key={i} className="relative">
+          <div className={cn(
+            "w-16 h-16 bg-gray-200 rounded-full border-4 border-gray-400 mx-auto",
+            processRunning ? `animate-spin-${centrifugeSpeed}` : ""
+          )}>
+            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+              {Math.min(99, Math.floor(enrichmentLevel * (i+1)/centrifugeCount))}%
+            </div>
+          </div>
+          {i < Math.min(centrifugeCount, 5) - 1 && 
+            <div className="w-6 h-2 bg-gray-400 mx-auto"></div>
+          }
+        </div>
+      );
+    }
+    return centrifuges;
+  };
+
+  // Create custom animation classes for different speeds
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes spin-${centrifugeSpeed} {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin-${centrifugeSpeed} {
+        animation: spin-${centrifugeSpeed} ${Math.max(0.1, 2 - (centrifugeSpeed/100)*1.8)}s linear infinite;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, [centrifugeSpeed]);
+
   return (
     <Card className={cn('p-4 relative overflow-hidden', className)}>
       <div className="space-y-6">
@@ -161,7 +203,46 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
           </Button>
         </div>
         
-        {/* Centrifuge Configuration */}
+        {/* Visual representation of centrifuges */}
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
+          <div className="text-center mb-2 font-bold">Zentrifugen-Kaskade</div>
+          <div className="flex flex-col items-center">
+            {/* Input material indicator */}
+            <div className="w-20 h-10 bg-yellow-700 rounded-lg mb-4 flex items-center justify-center text-white font-bold">
+              Natur-Uran
+            </div>
+            
+            {/* Centrifuge animation */}
+            <div className="flex flex-row items-center justify-center space-x-2 mb-4">
+              {renderCentrifuges()}
+            </div>
+            
+            {/* Output containers */}
+            <div className="flex justify-between w-full">
+              <div className="flex flex-col items-center">
+                <div className={cn(
+                  "w-16 h-16 rounded-lg flex items-center justify-center text-white font-bold transition-all",
+                  enrichmentLevel < 20 ? "bg-green-500" : 
+                  enrichmentLevel < 90 ? "bg-orange-500" : "bg-red-500"
+                )}>
+                  {enrichmentLevel.toFixed(1)}%
+                </div>
+                <div className="text-xs mt-1">Angereichertes Uran</div>
+                <div className="text-xs font-bold">{enrichedOutput.toFixed(1)} kg</div>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 bg-gray-400 rounded-lg flex items-center justify-center text-white font-bold">
+                  {(100 - enrichmentLevel).toFixed(1)}%
+                </div>
+                <div className="text-xs mt-1">Abgereichertes Uran</div>
+                <div className="text-xs font-bold">{depletedOutput.toFixed(1)} kg</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Control panel */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
             <div>
@@ -258,18 +339,17 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
                   instability > 75 ? "bg-red-200" : ""
                 )}
               />
+              {instability > 50 && (
+                <div className="flex justify-center mt-2">
+                  <div className={cn(
+                    "animate-pulse px-2 py-1 rounded text-xs font-bold",
+                    instability > 75 ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
+                  )}>
+                    Achtung: Instabilität {instability > 75 ? "sehr hoch!" : "erhöht!"}
+                  </div>
+                </div>
+              )}
             </div>
-            
-            {progress === 100 && (
-              <div className="space-y-2 mt-2">
-                <div className="text-sm">
-                  <span className="font-medium">Angereichertes Uran:</span> {enrichedOutput.toFixed(2)} kg
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">Abgereichertes Uran:</span> {depletedOutput.toFixed(2)} kg
-                </div>
-              </div>
-            )}
           </div>
         </div>
         
@@ -278,7 +358,7 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
           <Button 
             onClick={toggleProcess}
             className={cn(
-              "w-40",
+              "w-40 h-12 rounded-full text-lg font-bold",
               processRunning ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"
             )}
           >
