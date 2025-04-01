@@ -3,13 +3,15 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { AtomProps } from './Atom';
-import { Atom, Zap, Play, RefreshCw } from 'lucide-react';
+import { Atom, Zap, Play, RefreshCw, Waves, Flame } from 'lucide-react';
 
 interface GameControlsProps {
   onSelectElement: (element: AtomProps['element']) => void;
   selectedElement: AtomProps['element'] | null;
   onReset: () => void;
   onFireNeutron: () => void;
+  onSpeedChange: (speed: 'slow' | 'fast') => void;
+  neutronSpeed: 'slow' | 'fast';
   canFireNeutron: boolean;
   className?: string;
 }
@@ -19,6 +21,8 @@ export const GameControls = ({
   selectedElement,
   onReset,
   onFireNeutron,
+  onSpeedChange,
+  neutronSpeed,
   canFireNeutron,
   className,
 }: GameControlsProps) => {
@@ -69,9 +73,35 @@ export const GameControls = ({
         </Button>
       </div>
       
-      <div className="text-center mt-2">
+      <div className="flex justify-center gap-2">
+        <Button
+          onClick={() => onSpeedChange('slow')}
+          variant={neutronSpeed === 'slow' ? 'default' : 'outline'}
+          className={cn(
+            'bg-blue-500 hover:bg-blue-600',
+            neutronSpeed === 'slow' ? 'ring-2 ring-offset-2 ring-blue-300' : ''
+          )}
+        >
+          <Waves className="mr-2 h-4 w-4" />
+          Langsame Neutronen
+        </Button>
+        
+        <Button
+          onClick={() => onSpeedChange('fast')}
+          variant={neutronSpeed === 'fast' ? 'default' : 'outline'}
+          className={cn(
+            'bg-red-500 hover:bg-red-600',
+            neutronSpeed === 'fast' ? 'ring-2 ring-offset-2 ring-red-300' : ''
+          )}
+        >
+          <Flame className="mr-2 h-4 w-4" />
+          Schnelle Neutronen
+        </Button>
+      </div>
+      
+      <div className="text-center">
         <p className="text-sm text-gray-500">
-          Tipp: Klicke in der Spielfläche, um Neutronen zu platzieren. Ziehe Neutronen per Drag & Drop auf Elemente.
+          Tipp: Uran-238 absorbiert nur langsame Neutronen, während Plutonium-239 auf beide Arten reagiert.
         </p>
       </div>
     </div>

@@ -9,6 +9,7 @@ interface NeutronProps {
   isAnimating?: boolean;
   isDraggable?: boolean;
   position?: { x: number, y: number };
+  speed?: 'slow' | 'fast';
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: (e: React.DragEvent) => void;
 }
@@ -25,6 +26,11 @@ const fontSizeClasses = {
   lg: 'text-sm',
 };
 
+const speedClasses = {
+  slow: 'bg-blue-500',
+  fast: 'bg-red-500',
+};
+
 export const Neutron = ({
   size = 'md',
   onClick,
@@ -32,6 +38,7 @@ export const Neutron = ({
   isAnimating = false,
   isDraggable = false,
   position,
+  speed = 'fast',
   onDragStart,
   onDragEnd,
 }: NeutronProps) => {
@@ -39,6 +46,7 @@ export const Neutron = ({
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData('neutron', 'true');
+    e.dataTransfer.setData('neutronSpeed', speed);
     setIsDragging(true);
     if (onDragStart) onDragStart(e);
   };
@@ -51,11 +59,12 @@ export const Neutron = ({
   return (
     <div
       className={cn(
-        'neutron bg-atom-neutron rounded-full cursor-pointer hover:scale-110 transition-transform flex items-center justify-center',
+        'neutron rounded-full cursor-pointer hover:scale-110 transition-transform flex items-center justify-center',
         sizeClasses[size],
         fontSizeClasses[size],
         isAnimating ? 'animate-pulse' : '',
         isDragging ? 'opacity-50' : '',
+        speed === 'slow' ? 'bg-blue-500' : 'bg-atom-neutron',
         className
       )}
       style={position ? { 

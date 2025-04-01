@@ -23,16 +23,20 @@ interface GameProps {
 
 const MAX_ENERGY = 1000;
 
-const getExplanationForElement = (element: AtomProps['element'] | null): string => {
+const getExplanationForElement = (element: AtomProps['element'] | null, neutronSpeed: 'slow' | 'fast'): string => {
   switch (element) {
     case 'uranium235':
-      return "Uran-235 ist ein Isotop, das gut für Kernspaltung geeignet ist. Wenn ein Neutron auf seinen Kern trifft, teilt er sich oft in zwei kleinere Kerne und setzt dabei Energie und neue Neutronen frei.";
+      return "Uran-235 ist ein Isotop, das gut für Kernspaltung geeignet ist. Es reagiert auf schnelle und langsame Neutronen, wobei langsame etwas effektiver sind.";
     case 'uranium238':
-      return "Uran-238 ist das häufigste Uran-Isotop, aber es ist schwer spaltbar. Neutronen werden meist absorbiert, ohne eine Spaltung auszulösen.";
+      return neutronSpeed === 'slow' 
+        ? "Uran-238 absorbiert langsame Neutronen und wandelt sich in Uran-239 um, das über Neptunium-239 zu Plutonium-239 zerfällt." 
+        : "Uran-238 reagiert kaum auf schnelle Neutronen. Versuche es mit langsamen Neutronen!";
     case 'plutonium239':
-      return "Plutonium-239 ist ein künstliches Element, das sehr gut spaltbar ist. Es kann viel Energie freisetzen und wird in Kernkraftwerken genutzt.";
+      return "Plutonium-239 ist ein künstliches Element, das sehr gut spaltbar ist. Es reagiert gut auf schnelle und langsame Neutronen und setzt beim Spalten viel Energie frei.";
     case 'thorium232':
-      return "Thorium-232 ist nicht direkt spaltbar. Es kann aber Neutronen einfangen und sich in spaltbares Uran-233 umwandeln.";
+      return neutronSpeed === 'slow'
+        ? "Thorium-232 kann mit langsamen Neutronen Thorium-233 bilden, das über Protactinium-233 zu Uran-233 zerfällt."
+        : "Thorium-232 reagiert kaum auf schnelle Neutronen. Verwende langsame Neutronen für bessere Ergebnisse.";
     default:
       return "Wähle ein Element aus, dann erkläre ich dir mehr darüber!";
   }
@@ -43,6 +47,7 @@ export const Game = ({ className }: GameProps) => {
   const [totalEnergy, setTotalEnergy] = useState(0);
   const [neutronCount, setNeutronCount] = useState(0);
   const [canFireNeutron, setCanFireNeutron] = useState(false);
+  const [neutronSpeed, setNeutronSpeed] = useState<'slow' | 'fast'>('fast');
 
   useEffect(() => {
     setCanFireNeutron(!!selectedElement && neutronCount > 0);
@@ -71,6 +76,10 @@ export const Game = ({ className }: GameProps) => {
     setNeutronCount(0);
     setCanFireNeutron(false);
   };
+  
+  const handleSpeedChange = (speed: 'slow' | 'fast') => {
+    setNeutronSpeed(speed);
+  };
 
   return (
     <div className={cn('space-y-6', className)}>
@@ -87,11 +96,12 @@ export const Game = ({ className }: GameProps) => {
               <DialogTitle className="text-2xl">Wie man spielt</DialogTitle>
               <DialogDescription className="text-lg pt-4 space-y-2">
                 <p>1. Wähle ein Element aus den Knöpfen unten.</p>
-                <p>2. Klicke irgendwo im Spielfeld, um ein Neutron zu platzieren.</p>
-                <p>3. Klicke auf das Neutron, um es auf den Atomkern zu schießen.</p>
-                <p>4. Sieh zu, was passiert! Manche Elemente spalten leichter als andere.</p>
-                <p>5. Wenn eine Spaltung stattfindet, werden neue Neutronen und Energie freigesetzt.</p>
-                <p>6. Versuche, die Energieanzeige zu füllen!</p>
+                <p>2. Wähle zwischen schnellen und langsamen Neutronen.</p>
+                <p>3. Klicke irgendwo im Spielfeld, um ein Neutron zu platzieren.</p>
+                <p>4. Ziehe das Neutron auf den Atomkern, um eine Reaktion auszulösen.</p>
+                <p>5. Sieh zu, was passiert! Verschiedene Elemente reagieren unterschiedlich auf schnelle und langsame Neutronen.</p>
+                <p>6. Uran-238 absorbiert langsame Neutronen und startet eine Umwandlungskette zu Plutonium.</p>
+                <p>7. Versuche, die Energieanzeige zu füllen!</p>
               </DialogDescription>
             </DialogHeader>
           </DialogContent>
@@ -104,11 +114,12 @@ export const Game = ({ className }: GameProps) => {
             <GameArea 
               selectedElement={selectedElement}
               onFission={handleFission}
+              neutronSpeed={neutronSpeed}
             />
           </div>
           <div className="flex flex-col space-y-6">
             <Explanation 
-              text={getExplanationForElement(selectedElement)} 
+              text={getExplanationForElement(selectedElement, neutronSpeed)} 
             />
             <div className="flex flex-col space-y-2">
               <EnergyBar 
@@ -127,6 +138,8 @@ export const Game = ({ className }: GameProps) => {
           onSelectElement={handleElementSelect}
           onReset={handleReset}
           onFireNeutron={handleFireNeutron}
+          onSpeedChange={handleSpeedChange}
+          neutronSpeed={neutronSpeed}
           canFireNeutron={canFireNeutron}
         />
       </div>

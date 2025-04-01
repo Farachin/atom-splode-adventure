@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Atom, { AtomProps } from './Atom';
@@ -17,6 +18,7 @@ interface GameAreaProps {
   selectedElement: AtomProps['element'] | null;
   onFission: (energy: number, neutronCount: number) => void;
   className?: string;
+  neutronSpeed: 'slow' | 'fast';
 }
 
 interface FissionEffect {
@@ -41,16 +43,33 @@ interface NeutronObject {
   id: string;
   position: Position;
   isMoving: boolean;
+  speed: 'slow' | 'fast';
   targetPosition?: Position;
 }
 
-const elementFissionProperties = {
+interface ElementFissionProperties {
+  canFission: boolean;
+  energyReleased: number;
+  neutronReleased: number;
+  probability: number;
+  products: string[];
+  canAbsorb?: boolean;
+  transformTo?: string;
+  isDecaying?: boolean;
+  decayTo?: string;
+  decayTime?: number;
+  decayType?: string;
+  preferredNeutronSpeed?: 'slow' | 'fast' | 'both';
+}
+
+const elementFissionProperties: Record<string, ElementFissionProperties> = {
   uranium235: {
     canFission: true,
     energyReleased: 200,
     neutronReleased: 3,
     probability: 0.95,
     products: ['barium', 'krypton'],
+    preferredNeutronSpeed: 'both',
   },
   uranium238: {
     canFission: false,
@@ -60,6 +79,7 @@ const elementFissionProperties = {
     probability: 0.7,
     products: [],
     transformTo: 'uranium239',
+    preferredNeutronSpeed: 'slow',
   },
   uranium239: {
     canFission: false,
@@ -91,6 +111,7 @@ const elementFissionProperties = {
     neutronReleased: 3,
     probability: 0.9,
     products: ['xenon', 'zirconium'],
+    preferredNeutronSpeed: 'both',
   },
   thorium232: {
     canFission: false,
@@ -98,6 +119,7 @@ const elementFissionProperties = {
     neutronReleased: 0,
     probability: 0.1,
     products: [],
+    preferredNeutronSpeed: 'slow',
   },
   // Add fission properties for product elements
   barium: {
@@ -166,11 +188,12 @@ const elementFissionProperties = {
   },
 };
 
-export const GameArea = ({ selectedElement, onFission, className }: GameAreaProps) => {
+export const GameArea = ({ selectedElement, onFission, className, neutronSpeed = 'fast' }: GameAreaProps) => {
   const [elements, setElements] = useState<AtomicElement[]>([]);
   const [neutrons, setNeutrons] = useState<NeutronObject[]>([]);
   const [effects, setEffects] = useState<FissionEffect[]>([]);
   const [draggingNeutronId, setDraggingNeutronId] = useState<string | null>(null);
+  const [draggingNeutronSpeed, setDraggingNeutronSpeed] = useState<'slow' | 'fast'>('fast');
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -235,14 +258,17 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
     const newNeutron = {
       id: `neutron-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       position: { x: clickX, y: clickY },
-      isMoving: false
+      isMoving: false,
+      speed: neutronSpeed
     };
     
     setNeutrons(prev => [...prev, newNeutron]);
   };
 
-  const handleNeutronDragStart = (id: string) => {
+  const handleNeutronDragStart = (id: string, e: React.DragEvent) => {
     setDraggingNeutronId(id);
+    const speedData = e.dataTransfer.getData('neutronSpeed') as 'slow' | 'fast';
+    setDraggingNeutronSpeed(speedData || neutronSpeed);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -276,7 +302,7 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
       
       // Schedule fission after animation
       setTimeout(() => {
-        processElementFission(targetElement, draggingNeutronId!);
+        processElementFission(targetElement, draggingNeutronId!, draggingNeutronSpeed);
       }, 500);
     } else {
       // Just move the neutron to the new position
@@ -290,15 +316,37 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
     setDraggingNeutronId(null);
   };
 
-  const processElementFission = (element: AtomicElement, neutronId: string) => {
+  const processElementFission = (element: AtomicElement, neutronId: string, neutronSpeed: 'slow' | 'fast') => {
     const elementType = element.type as keyof typeof elementFissionProperties;
     const fissionProperties = elementFissionProperties[elementType];
-    const willFission = Math.random() < fissionProperties.probability;
+    
+    // Check if this neutron speed is effective for this element
+    let speedProbabilityModifier = 1;
+    if (fissionProperties.preferredNeutronSpeed) {
+      if (fissionProperties.preferredNeutronSpeed === 'slow' && neutronSpeed === 'fast') {
+        speedProbabilityModifier = 0.2; // Fast neutrons are less effective for slow-preferring elements
+      } else if (fissionProperties.preferredNeutronSpeed === 'fast' && neutronSpeed === 'slow') {
+        speedProbabilityModifier = 0.3; // Slow neutrons are less effective for fast-preferring elements
+      }
+    }
+    
+    const adjustedProbability = fissionProperties.probability * speedProbabilityModifier;
+    const willFission = Math.random() < adjustedProbability;
     
     // Remove the neutron used for this attempt
     setNeutrons(prev => prev.filter(n => n.id !== neutronId));
     
     if (fissionProperties.canAbsorb && fissionProperties.transformTo) {
+      // Check for neutron speed preference for absorption
+      if (fissionProperties.preferredNeutronSpeed === 'slow' && neutronSpeed === 'fast') {
+        toast({
+          title: "Zu schnelles Neutron",
+          description: `${elementType} kann nur langsame Neutronen effektiv absorbieren.`,
+          duration: 3000,
+        });
+        return;
+      }
+      
       // Handle neutron absorption (for U-238 → U-239)
       setEffects(prev => [...prev, {
         id: `absorption-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -369,7 +417,8 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
               x: element.position.x + Math.cos(angle) * distance,
               y: element.position.y + Math.sin(angle) * distance
             },
-            isMoving: false
+            isMoving: false,
+            speed: 'fast' // Newly created neutrons are fast by default
           });
         }
         setNeutrons(prev => [...prev, ...newNeutrons]);
@@ -402,11 +451,19 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
       }, 800);
     } else {
       // Failed fission
+      let failureReason = "";
+      
+      if (!fissionProperties.canFission) {
+        failureReason = `${elementType} ist nicht gut spaltbar.`;
+      } else if (speedProbabilityModifier < 1) {
+        failureReason = `${elementType} benötigt ${fissionProperties.preferredNeutronSpeed === 'slow' ? 'langsame' : 'schnelle'} Neutronen für optimale Spaltung.`;
+      } else {
+        failureReason = "Das Neutron hat den Kern nicht richtig getroffen.";
+      }
+      
       toast({
         title: "Keine Kernspaltung",
-        description: !fissionProperties.canFission
-          ? `${elementType} ist nicht gut spaltbar.`
-          : "Das Neutron hat den Kern nicht richtig getroffen.",
+        description: failureReason,
         duration: 3000,
       });
     }
@@ -465,12 +522,26 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
     
     // Schedule fission after animation
     setTimeout(() => {
-      processElementFission(targetElement, neutronToFire.id);
+      processElementFission(targetElement, neutronToFire.id, neutronToFire.speed);
     }, 500);
   };
 
   const removeEffect = (id: string) => {
     setEffects(effects.filter(effect => effect.id !== id));
+  };
+
+  // Display a tooltip for neutron speed compatibility with elements
+  const getNeutronSpeedInfo = (elementType: string) => {
+    const properties = elementFissionProperties[elementType as keyof typeof elementFissionProperties];
+    if (!properties || !properties.preferredNeutronSpeed) return "";
+    
+    if (properties.preferredNeutronSpeed === 'slow') {
+      return "Bevorzugt langsame Neutronen";
+    } else if (properties.preferredNeutronSpeed === 'fast') {
+      return "Bevorzugt schnelle Neutronen";
+    } else {
+      return "Reagiert auf alle Neutronen";
+    }
   };
 
   const getProductColor = (productType: string) => {
@@ -542,6 +613,9 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
               }}
             >
               {getProductLabel(element.type)}
+              <div className="absolute -bottom-5 text-xs text-gray-700 whitespace-nowrap">
+                {getNeutronSpeedInfo(element.type)}
+              </div>
             </div>
           );
         } else {
@@ -561,9 +635,17 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
                   <div className={`bg-atom-${elementType || 'plutonium239'} w-24 h-24 rounded-full flex items-center justify-center text-white font-bold`}>
                     {getIsotopeLabel(elementType)}
                   </div>
+                  <div className="absolute -bottom-5 text-xs text-gray-700 whitespace-nowrap">
+                    {getNeutronSpeedInfo(elementType)}
+                  </div>
                 </div>
               ) : (
-                <Atom element={elementType as AtomProps['element']} size="lg" />
+                <div className="relative">
+                  <Atom element={elementType as AtomProps['element']} size="lg" />
+                  <div className="absolute -bottom-12 text-xs text-gray-700 whitespace-nowrap">
+                    {getNeutronSpeedInfo(elementType)}
+                  </div>
+                </div>
               )}
             </div>
           );
@@ -589,7 +671,8 @@ export const GameArea = ({ selectedElement, onFission, className }: GameAreaProp
             size="md" 
             isAnimating={neutron.isMoving}
             isDraggable={!neutron.isMoving}
-            onDragStart={() => handleNeutronDragStart(neutron.id)}
+            speed={neutron.speed}
+            onDragStart={(e) => handleNeutronDragStart(neutron.id, e)}
           />
         </div>
       ))}
