@@ -26,11 +26,6 @@ const fontSizeClasses = {
   lg: 'text-sm',
 };
 
-const speedClasses = {
-  slow: 'bg-blue-500',
-  fast: 'bg-red-500',
-};
-
 export const Neutron = ({
   size = 'md',
   onClick,
@@ -79,6 +74,18 @@ export const Neutron = ({
       onDragEnd={isDraggable ? handleDragEnd : undefined}
     >
       <span className="font-bold text-white select-none">n</span>
+      
+      {/* Optional visual indicator for neutron speed */}
+      {speed === 'slow' && (
+        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 text-[6px] text-blue-700 whitespace-nowrap">
+          langsam
+        </div>
+      )}
+      {speed === 'fast' && (
+        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 text-[6px] text-orange-700 whitespace-nowrap">
+          schnell
+        </div>
+      )}
     </div>
   );
 };

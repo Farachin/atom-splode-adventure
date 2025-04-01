@@ -26,11 +26,11 @@ export const GameControls = ({
   canFireNeutron,
   className,
 }: GameControlsProps) => {
-  const elements: { value: AtomProps['element']; label: string }[] = [
-    { value: 'uranium235', label: 'Uran-235' },
-    { value: 'uranium238', label: 'Uran-238' },
-    { value: 'plutonium239', label: 'Plutonium-239' },
-    { value: 'thorium232', label: 'Thorium-232' },
+  const elements: { value: AtomProps['element']; label: string; description: string }[] = [
+    { value: 'uranium235', label: 'Uran-235', description: 'Gut spaltbar' },
+    { value: 'uranium238', label: 'Uran-238', description: 'Absorbiert langsame Neutronen' },
+    { value: 'plutonium239', label: 'Plutonium-239', description: 'Sehr gut spaltbar' },
+    { value: 'thorium232', label: 'Thorium-232', description: 'Brutelement' },
   ];
 
   return (
@@ -49,7 +49,10 @@ export const GameControls = ({
             )}
           >
             <Atom className="mr-2 h-4 w-4" />
-            {element.label}
+            <div className="flex flex-col items-start">
+              <span>{element.label}</span>
+              <span className="text-xs opacity-80">{element.description}</span>
+            </div>
           </Button>
         ))}
       </div>
@@ -83,7 +86,10 @@ export const GameControls = ({
           )}
         >
           <Waves className="mr-2 h-4 w-4" />
-          Langsame Neutronen
+          <div className="flex flex-col items-start">
+            <span>Langsame Neutronen</span>
+            <span className="text-xs opacity-80">Für U-238 Absorption</span>
+          </div>
         </Button>
         
         <Button
@@ -95,7 +101,10 @@ export const GameControls = ({
           )}
         >
           <Flame className="mr-2 h-4 w-4" />
-          Schnelle Neutronen
+          <div className="flex flex-col items-start">
+            <span>Schnelle Neutronen</span>
+            <span className="text-xs opacity-80">Besser für Spaltung</span>
+          </div>
         </Button>
       </div>
       
