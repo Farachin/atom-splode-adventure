@@ -150,29 +150,23 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
     return feedAmount * outputPercentage * instabilityFactor;
   };
 
-  // Helper function to generate centrifuges
+  // Helper function to generate centrifuges - limit to 5 max
   const renderCentrifuges = () => {
     const centrifuges = [];
-    // Show all centrifuges instead of limiting to 5
-    const maxCentrifugesToShow = centrifugeCount;
+    const maxCentrifuges = Math.min(5, centrifugeCount);
     
-    // Calculate if we need to compress the display
-    const isCompressed = centrifugeCount > 8;
-    const centrifugeSize = isCompressed ? 12 : 16;
-    const marginClass = isCompressed ? "mx-px" : "mx-auto";
-    
-    for (let i = 0; i < maxCentrifugesToShow; i++) {
+    for (let i = 0; i < maxCentrifuges; i++) {
       centrifuges.push(
         <div key={i} className="relative">
           <div className={cn(
-            `w-${centrifugeSize} h-${centrifugeSize} bg-gray-200 rounded-full border-4 border-gray-400 ${marginClass}`,
+            "w-16 h-16 bg-gray-200 rounded-full border-4 border-gray-400 mx-auto",
             processRunning ? `animate-spin-${centrifugeSpeed}` : ""
           )}>
             <div className="absolute inset-0 flex items-center justify-center text-xs font-bold">
               {Math.min(99, Math.floor(enrichmentLevel * (i+1)/centrifugeCount))}%
             </div>
           </div>
-          {i < maxCentrifugesToShow - 1 && 
+          {i < maxCentrifuges - 1 && 
             <div className="w-6 h-2 bg-gray-400 mx-auto"></div>
           }
         </div>
@@ -224,16 +218,13 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
           <div className="text-center mb-2 font-bold">Zentrifugen-Kaskade</div>
           <div className="flex flex-col items-center">
-            {/* Input material indicator - centered and improved */}
+            {/* Input material indicator - properly centered */}
             <div className="w-24 h-12 bg-yellow-800 rounded-lg mb-4 flex items-center justify-center text-white font-bold shadow-md">
-              Natururan
+              <span className="text-center">Natururan</span>
             </div>
             
-            {/* Centrifuge animation - scrollable for many centrifuges */}
-            <div className={cn(
-              "flex flex-row items-center justify-center space-x-2 mb-4",
-              centrifugeCount > 8 ? "overflow-x-auto max-w-full pb-2" : ""
-            )}>
+            {/* Centrifuge animation - limited to 5 */}
+            <div className="flex flex-row items-center justify-center space-x-2 mb-4">
               {renderCentrifuges()}
             </div>
             
@@ -279,7 +270,7 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
                 disabled={processRunning}
                 value={[centrifugeCount]} 
                 min={1} 
-                max={10} 
+                max={5} // Changed from 10 to 5
                 step={1}
                 onValueChange={(value) => setCentrifugeCount(value[0])}
                 className="mt-2"

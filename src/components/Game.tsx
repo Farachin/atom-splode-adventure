@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import GameArea from './GameArea';
@@ -19,6 +20,7 @@ import {
   DialogTrigger
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from '@/hooks/use-toast';
 
 interface GameProps {
@@ -59,7 +61,7 @@ export const Game = ({ className }: GameProps) => {
   const [showExplosion, setShowExplosion] = useState(false);
   const [explosionYield, setExplosionYield] = useState(0);
   const [bombType, setBombType] = useState("");
-  const [showAdvancedLabs, setShowAdvancedLabs] = useState(false);
+  const [isAdvancedLabsOpen, setIsAdvancedLabsOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -269,24 +271,36 @@ export const Game = ({ className }: GameProps) => {
       </Tabs>
       
       <div className="flex justify-center">
-        <Button
-          variant="ghost" 
-          size="sm"
-          onClick={() => setShowAdvancedLabs(!showAdvancedLabs)}
-          className="text-sm"
-        >
-          {showAdvancedLabs ? (
-            <>
-              <ChevronUp className="w-4 h-4 mr-1" />
-              Erweiterte Labore ausblenden
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-4 h-4 mr-1" />
-              Erweiterte Labore anzeigen
-            </>
-          )}
-        </Button>
+        <Collapsible open={isAdvancedLabsOpen} onOpenChange={setIsAdvancedLabsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost" 
+              size="sm"
+              className="text-sm"
+            >
+              {isAdvancedLabsOpen ? (
+                <>
+                  <ChevronUp className="w-4 h-4 mr-1" />
+                  Erweiterte Labore ausblenden
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4 mr-1" />
+                  Erweiterte Labore anzeigen
+                </>
+              )}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4 space-y-4">
+            <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <h3 className="font-medium mb-2">Fortgeschrittene Kernphysik:</h3>
+              <p className="text-sm">
+                Hier könnten zusätzliche Experimente und Informationen zur Kernphysik angezeigt werden.
+                Diese Funktion wird in zukünftigen Updates freigeschaltet.
+              </p>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
       
       {showExplosion && (
