@@ -150,21 +150,29 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
     return feedAmount * outputPercentage * instabilityFactor;
   };
 
-  // Helper function to generate multiple centrifuges
+  // Helper function to generate centrifuges
   const renderCentrifuges = () => {
     const centrifuges = [];
-    for (let i = 0; i < Math.min(centrifugeCount, 5); i++) {
+    // Show all centrifuges instead of limiting to 5
+    const maxCentrifugesToShow = centrifugeCount;
+    
+    // Calculate if we need to compress the display
+    const isCompressed = centrifugeCount > 8;
+    const centrifugeSize = isCompressed ? 12 : 16;
+    const marginClass = isCompressed ? "mx-px" : "mx-auto";
+    
+    for (let i = 0; i < maxCentrifugesToShow; i++) {
       centrifuges.push(
         <div key={i} className="relative">
           <div className={cn(
-            "w-16 h-16 bg-gray-200 rounded-full border-4 border-gray-400 mx-auto",
+            `w-${centrifugeSize} h-${centrifugeSize} bg-gray-200 rounded-full border-4 border-gray-400 ${marginClass}`,
             processRunning ? `animate-spin-${centrifugeSpeed}` : ""
           )}>
             <div className="absolute inset-0 flex items-center justify-center text-xs font-bold">
               {Math.min(99, Math.floor(enrichmentLevel * (i+1)/centrifugeCount))}%
             </div>
           </div>
-          {i < Math.min(centrifugeCount, 5) - 1 && 
+          {i < maxCentrifugesToShow - 1 && 
             <div className="w-6 h-2 bg-gray-400 mx-auto"></div>
           }
         </div>
@@ -192,6 +200,15 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
     };
   }, [centrifugeSpeed]);
 
+  // Get color based on enrichment level
+  const getEnrichmentColor = (level) => {
+    if (level < 5) return "bg-green-500";
+    if (level < 20) return "bg-lime-500";
+    if (level < 50) return "bg-yellow-500";
+    if (level < 90) return "bg-orange-500";
+    return "bg-red-500";
+  };
+
   return (
     <Card className={cn('p-4 relative overflow-hidden', className)}>
       <div className="space-y-6">
@@ -207,36 +224,47 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
           <div className="text-center mb-2 font-bold">Zentrifugen-Kaskade</div>
           <div className="flex flex-col items-center">
-            {/* Input material indicator */}
-            <div className="w-20 h-10 bg-yellow-700 rounded-lg mb-4 flex items-center justify-center text-white font-bold">
-              Natur-Uran
+            {/* Input material indicator - centered and improved */}
+            <div className="w-24 h-12 bg-yellow-800 rounded-lg mb-4 flex items-center justify-center text-white font-bold shadow-md">
+              Natururan
             </div>
             
-            {/* Centrifuge animation */}
-            <div className="flex flex-row items-center justify-center space-x-2 mb-4">
+            {/* Centrifuge animation - scrollable for many centrifuges */}
+            <div className={cn(
+              "flex flex-row items-center justify-center space-x-2 mb-4",
+              centrifugeCount > 8 ? "overflow-x-auto max-w-full pb-2" : ""
+            )}>
               {renderCentrifuges()}
             </div>
             
-            {/* Output containers */}
+            {/* Output containers with improved visuals */}
             <div className="flex justify-between w-full">
               <div className="flex flex-col items-center">
                 <div className={cn(
-                  "w-16 h-16 rounded-lg flex items-center justify-center text-white font-bold transition-all",
-                  enrichmentLevel < 20 ? "bg-green-500" : 
-                  enrichmentLevel < 90 ? "bg-orange-500" : "bg-red-500"
+                  "w-24 h-24 rounded-lg flex flex-col items-center justify-center text-white font-bold transition-all transform hover:scale-105 shadow-lg",
+                  getEnrichmentColor(enrichmentLevel),
+                  enrichmentLevel >= 90 ? "animate-pulse-grow" : ""
                 )}>
-                  {enrichmentLevel.toFixed(1)}%
+                  <div className="text-xl">{enrichmentLevel.toFixed(1)}%</div>
+                  <div className="text-xs mt-1">U-235</div>
+                  <div className="mt-2">
+                    <span className="text-xs">⭐ Wertvoll ⭐</span>
+                  </div>
                 </div>
-                <div className="text-xs mt-1">Angereichertes Uran</div>
-                <div className="text-xs font-bold">{enrichedOutput.toFixed(1)} kg</div>
+                <div className="text-xs mt-2 font-bold">Angereichertes Uran</div>
+                <div className="text-xs">{enrichedOutput.toFixed(1)} kg</div>
               </div>
               
               <div className="flex flex-col items-center">
-                <div className="w-16 h-16 bg-gray-400 rounded-lg flex items-center justify-center text-white font-bold">
-                  {(100 - enrichmentLevel).toFixed(1)}%
+                <div className="w-24 h-24 bg-gray-500 rounded-lg flex flex-col items-center justify-center text-white shadow-md">
+                  <div className="text-xl">{(100 - enrichmentLevel).toFixed(1)}%</div>
+                  <div className="text-xs mt-1">U-238</div>
+                  <div className="mt-2">
+                    <span className="text-xs">Abfall</span>
+                  </div>
                 </div>
-                <div className="text-xs mt-1">Abgereichertes Uran</div>
-                <div className="text-xs font-bold">{depletedOutput.toFixed(1)} kg</div>
+                <div className="text-xs mt-2 font-bold">Abgereichertes Uran</div>
+                <div className="text-xs">{depletedOutput.toFixed(1)} kg</div>
               </div>
             </div>
           </div>
