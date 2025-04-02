@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import GameArea from './GameArea';
@@ -14,7 +13,7 @@ import ChainReactionSimulator from './ChainReactionSimulator';
 import RadiationEffectsLab from './RadiationEffectsLab';
 import { AtomProps } from './Atom';
 import { Button } from '@/components/ui/button';
-import { HelpCircle, ChevronDown, ChevronUp, Atom, Zap, Flask, BarChart3, Radiation, Flame } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, Atom, Zap, FlaskConical, BarChart3, Radiation, Flame } from 'lucide-react';
 import { 
   Dialog,
   DialogContent,
@@ -247,7 +246,7 @@ export const Game = ({ className }: GameProps) => {
             <span>Kettenreaktion</span>
           </TabsTrigger>
           <TabsTrigger value="radiation" className="flex items-center">
-            <Flask className="h-4 w-4 mr-1" />
+            <FlaskConical className="h-4 w-4 mr-1" />
             <span>Strahlung</span>
           </TabsTrigger>
         </TabsList>
