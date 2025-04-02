@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -844,3 +845,290 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
                     </div>
                     <p className="text-xs text-gray-500">Schnelle Elektronen, mittlere Reichweite</p>
                   </Button>
+                  
+                  <Button 
+                    className={cn(
+                      "h-20 flex-col items-center justify-center space-y-2 text-left",
+                      selectedRadiation === 'gamma' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => !isExposing && setSelectedRadiation('gamma')}
+                    disabled={isExposing}
+                  >
+                    <div className="flex items-center">
+                      <Zap className="h-5 w-5 mr-2 text-green-500" />
+                      <span className="font-bold">Gamma</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Elektromagnetische Wellen, hohe Reichweite</p>
+                  </Button>
+                  
+                  <Button 
+                    className={cn(
+                      "h-20 flex-col items-center justify-center space-y-2 text-left",
+                      selectedRadiation === 'neutron' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => !isExposing && setSelectedRadiation('neutron')}
+                    disabled={isExposing}
+                  >
+                    <div className="flex items-center">
+                      <Atom className="h-5 w-5 mr-2 text-yellow-500" />
+                      <span className="font-bold">Neutronen</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Neutrale Teilchen, tief eindringend</p>
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">
+                    Intensität: {radiationIntensity}%
+                  </label>
+                  <Slider 
+                    value={[radiationIntensity]} 
+                    min={1} 
+                    max={100} 
+                    step={1} 
+                    onValueChange={values => !isExposing && setRadiationIntensity(values[0])} 
+                    disabled={isExposing}
+                  />
+                </div>
+                
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">
+                    Bestrahlungszeit: {radiationTime} Sekunden
+                  </label>
+                  <Slider 
+                    value={[radiationTime]} 
+                    min={1} 
+                    max={10} 
+                    step={1} 
+                    onValueChange={values => !isExposing && setRadiationTime(values[0])} 
+                    disabled={isExposing}
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="material" className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    className={cn(
+                      "h-20 flex-col items-center justify-center space-y-2 text-left",
+                      selectedMaterial === 'dna' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => !isExposing && setSelectedMaterial('dna')}
+                    disabled={isExposing}
+                  >
+                    <div className="flex items-center">
+                      <Dna className="h-5 w-5 mr-2 text-blue-500" />
+                      <span className="font-bold">DNA</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Kann mutieren oder beschädigt werden</p>
+                  </Button>
+                  
+                  <Button 
+                    className={cn(
+                      "h-20 flex-col items-center justify-center space-y-2 text-left",
+                      selectedMaterial === 'metal' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => !isExposing && setSelectedMaterial('metal')}
+                    disabled={isExposing}
+                  >
+                    <div className="flex items-center">
+                      <Shield className="h-5 w-5 mr-2 text-gray-500" />
+                      <span className="font-bold">Metall</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Kann Elektronen freisetzen</p>
+                  </Button>
+                  
+                  <Button 
+                    className={cn(
+                      "h-20 flex-col items-center justify-center space-y-2 text-left",
+                      selectedMaterial === 'plastic' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => !isExposing && setSelectedMaterial('plastic')}
+                    disabled={isExposing}
+                  >
+                    <div className="flex items-center">
+                      <Flask className="h-5 w-5 mr-2 text-purple-500" />
+                      <span className="font-bold">Kunststoff</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Kann durch Strahlung degradieren</p>
+                  </Button>
+                  
+                  <Button 
+                    className={cn(
+                      "h-20 flex-col items-center justify-center space-y-2 text-left",
+                      selectedMaterial === 'crystal' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => !isExposing && setSelectedMaterial('crystal')}
+                    disabled={isExposing}
+                  >
+                    <div className="flex items-center">
+                      <BellRing className="h-5 w-5 mr-2 text-cyan-500" />
+                      <span className="font-bold">Kristall</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Kann durch Strahlung leuchten</p>
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">
+                    Abschirmung: {shieldingLevel}%
+                  </label>
+                  <Slider 
+                    value={[shieldingLevel]} 
+                    min={0} 
+                    max={100} 
+                    step={5} 
+                    onValueChange={values => !isExposing && setShieldingLevel(values[0])} 
+                    disabled={isExposing}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
+            
+            <div className="pt-2 space-y-3">
+              {isExposing && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Verbleibende Zeit:</span>
+                    <span>{timeRemaining} Sekunden</span>
+                  </div>
+                  <Progress value={(timeRemaining / radiationTime) * 100} />
+                </div>
+              )}
+              
+              <Button 
+                className="w-full" 
+                onClick={isExposing ? undefined : handleStartExposure}
+                disabled={isExposing}
+              >
+                {isExposing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Bestrahlung läuft...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="mr-2 h-4 w-4" />
+                    Bestrahlung starten
+                  </>
+                )}
+              </Button>
+              
+              {isExposing && (
+                <Button
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setIsExposing(false);
+                    resetExperiment();
+                  }}
+                >
+                  <Hand className="mr-2 h-4 w-4" />
+                  Abbrechen
+                </Button>
+              )}
+              
+              {!isExposing && (timeRemaining === 0) && (
+                <Button
+                  variant="outline" 
+                  className="w-full"
+                  onClick={resetExperiment}
+                >
+                  <Backpack className="mr-2 h-4 w-4" />
+                  Zurücksetzen
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          <div className="relative">
+            <div className="aspect-square w-full bg-slate-50 rounded-lg overflow-hidden">
+              <canvas 
+                ref={canvasRef} 
+                className="w-full h-full"
+              />
+            </div>
+            
+            {!isExposing && selectedMaterial === 'dna' && dnaStrands.length > 0 && (
+              <div className="mt-2 p-2 bg-white rounded border text-xs">
+                <div className="font-semibold mb-1">DNA-Analyse:</div>
+                {dnaStrands.map(strand => {
+                  const damagedCount = strand.damaged.filter(Boolean).length;
+                  const mutatedCount = strand.mutated.filter(Boolean).length;
+                  return (
+                    <div key={strand.id} className="flex justify-between">
+                      <span>Strang {strand.id + 1}: {strand.sequence}</span>
+                      {(damagedCount > 0 || mutatedCount > 0) && (
+                        <span>
+                          {damagedCount > 0 && (
+                            <Badge variant="outline" className="ml-1 text-red-500 text-[10px] h-4 px-1">
+                              {damagedCount} beschädigt
+                            </Badge>
+                          )}
+                          {mutatedCount > 0 && (
+                            <Badge variant="outline" className="ml-1 text-purple-500 text-[10px] h-4 px-1">
+                              {mutatedCount} mutiert
+                            </Badge>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            
+            {!isExposing && selectedMaterial === 'metal' && electronEmission > 0 && (
+              <div className="mt-2 p-2 bg-white rounded border text-xs">
+                <div className="font-semibold mb-1">Photoelektrischer Effekt:</div>
+                <div className="flex justify-between">
+                  <span>Elektronenemission:</span>
+                  <span>{electronEmission.toFixed(1)}%</span>
+                </div>
+                <Progress value={electronEmission} className="h-2 mt-1" />
+              </div>
+            )}
+            
+            {!isExposing && selectedMaterial === 'plastic' && materialDegradation > 0 && (
+              <div className="mt-2 p-2 bg-white rounded border text-xs">
+                <div className="font-semibold mb-1">Materialdegradation:</div>
+                <div className="flex justify-between">
+                  <span>Schädigungsgrad:</span>
+                  <span>{materialDegradation.toFixed(1)}%</span>
+                </div>
+                <Progress value={materialDegradation} className="h-2 mt-1" />
+              </div>
+            )}
+            
+            {!isExposing && selectedMaterial === 'crystal' && crystalLuminescence > 0 && (
+              <div className="mt-2 p-2 bg-white rounded border text-xs">
+                <div className="font-semibold mb-1">Lumineszenz:</div>
+                <div className="flex justify-between">
+                  <span>Leuchtintensität:</span>
+                  <span>{crystalLuminescence.toFixed(1)}%</span>
+                </div>
+                <Progress value={crystalLuminescence} className="h-2 mt-1" />
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="text-sm text-gray-500 border-t pt-4">
+          <Microscope className="inline-block h-4 w-4 mr-1" />
+          <span className="align-middle">
+            Dieses Labor zeigt die Effekte verschiedener Strahlungsarten auf unterschiedliche Materialien.
+            Experimentiere mit den Einstellungen, um mehr zu lernen.
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+export default RadiationEffectsLab;
