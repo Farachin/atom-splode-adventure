@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { 
   Atom, 
   Dna, 
@@ -843,6 +844,3 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
                     </div>
                     <p className="text-xs text-gray-500">Schnelle Elektronen, mittlere Reichweite</p>
                   </Button>
-                  
-                  <Button 
-                    className={cn(
