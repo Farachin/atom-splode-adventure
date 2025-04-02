@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -194,7 +195,7 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
 
-  const checkParticleCollisionWithDNA = (particle: {x: number, y: number}) => {
+  const checkParticleCollisionWithDNA = (particle: {x: number, y: number, life: number, vx: number, vy: number}) => {
     if (dnaRungPositions.length === 0) return;
     
     // Prüfe Kollision mit DNA-Sprossen
@@ -346,7 +347,7 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     const cosTerm = Math.cos(randomAngle);
     const sinTerm = Math.sin(randomAngle);
     const newVx = vx * cosTerm - vy * sinTerm;
-    const newVy = vx * sinTerm + vy * sinTerm;
+    const newVy = vx * sinTerm + vy * cosTerm;
     
     const maxLife = Math.round(dist * lifeFactor);
     

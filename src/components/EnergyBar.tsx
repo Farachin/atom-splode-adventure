@@ -8,9 +8,10 @@ interface EnergyBarProps {
   value: number;
   maxValue: number;
   className?: string;
+  showMaxValue?: boolean;
 }
 
-export const EnergyBar = ({ value, maxValue, className }: EnergyBarProps) => {
+export const EnergyBar = ({ value, maxValue, className, showMaxValue = true }: EnergyBarProps) => {
   const percentage = Math.min(100, (value / maxValue) * 100);
   
   return (
@@ -23,10 +24,12 @@ export const EnergyBar = ({ value, maxValue, className }: EnergyBarProps) => {
         value={percentage} 
         className="h-4 w-full bg-gray-200" 
       />
-      <div className="flex w-full justify-between text-xs">
-        <span>0</span>
-        <span>{maxValue} MeV</span>
-      </div>
+      {showMaxValue && (
+        <div className="flex w-full justify-between text-xs">
+          <span>0</span>
+          <span>{maxValue} MeV</span>
+        </div>
+      )}
     </div>
   );
 };
