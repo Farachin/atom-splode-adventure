@@ -11,7 +11,7 @@ const Index = () => {
             Atom-Splode Abenteuer
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Entdecke die spannende Welt der Kernspaltung! 
+            Entdecke die spannende Welt der Kernphysik! 
             Experimentiere mit verschiedenen Elementen und sieh, 
             was passiert, wenn du Neutronen auf Atomkerne schießt.
           </p>
@@ -21,8 +21,9 @@ const Index = () => {
           <Game />
         </main>
 
-        <footer className="mt-12 text-center text-gray-500 text-sm">
-          <p>Ein interaktives Lernspiel über Kernspaltung für Kinder ab 5 Jahren</p>
+        <footer className="mt-12 text-center text-gray-500 text-sm py-4">
+          <p>Ein interaktives Lernspiel über Kernphysik für Kinder ab 5 Jahren</p>
+          <p className="mt-2">© {new Date().getFullYear()} - Alle Rechte vorbehalten</p>
         </footer>
       </div>
     </div>

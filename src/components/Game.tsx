@@ -8,9 +8,13 @@ import EnrichmentLab from './EnrichmentLab';
 import BombLab from './BombLab';
 import NuclearExplosion from './NuclearExplosion';
 import Explanation from './Explanation';
+import ReactorLab from './ReactorLab';
+import FusionLab from './FusionLab';
+import ChainReactionSimulator from './ChainReactionSimulator';
+import RadiationEffectsLab from './RadiationEffectsLab';
 import { AtomProps } from './Atom';
 import { Button } from '@/components/ui/button';
-import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, Atom, Zap, Flask, BarChart3, Radiation, Flame } from 'lucide-react';
 import { 
   Dialog,
   DialogContent,
@@ -22,6 +26,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
 
 interface GameProps {
   className?: string;
@@ -62,6 +67,7 @@ export const Game = ({ className }: GameProps) => {
   const [explosionYield, setExplosionYield] = useState(0);
   const [bombType, setBombType] = useState("");
   const [isAdvancedLabsOpen, setIsAdvancedLabsOpen] = useState(false);
+  const [totalKnowledge, setTotalKnowledge] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -94,6 +100,9 @@ export const Game = ({ className }: GameProps) => {
         description: `${newPlutonium.toFixed(2)}kg Plutonium-239 durch Neutroneneinfang und Zerfall.`,
       });
     }
+    
+    // Increment knowledge
+    setTotalKnowledge(prev => Math.min(100, prev + energy / 100));
   };
 
   const handleFireNeutron = () => {
@@ -143,6 +152,12 @@ export const Game = ({ className }: GameProps) => {
       description: `${bombType}-Bombe mit ${explosionYield.toFixed(1)} Kilotonnen Sprengkraft.`,
     });
   };
+  
+  const handleEnergyProduced = (amount: number) => {
+    setTotalEnergy(prev => Math.min(MAX_ENERGY, prev + amount));
+    // Also increment knowledge for energy production
+    setTotalKnowledge(prev => Math.min(100, prev + amount / 20));
+  };
 
   return (
     <div className={cn('space-y-6', className)}>
@@ -166,18 +181,75 @@ export const Game = ({ className }: GameProps) => {
                 <p>6. Uran-238 absorbiert langsame Neutronen und startet eine Umwandlungskette zu Plutonium.</p>
                 <p>7. Nutze das Anreicherungslabor, um Uran-235 anzureichern.</p>
                 <p>8. Mit ausreichend Material kannst du eine Atombombe bauen.</p>
-                <p>9. Versuche, die Energieanzeige zu füllen!</p>
+                <p>9. Im Reaktorlabor kannst du einen Kernreaktor bauen und betreiben.</p>
+                <p>10. Experimentiere mit Fusion, um zu verstehen, wie Sterne funktionieren.</p>
+                <p>11. Versuche, die Energieanzeige zu füllen!</p>
               </DialogDescription>
             </DialogHeader>
           </DialogContent>
         </Dialog>
       </div>
       
+      <div className="flex justify-between items-center bg-blue-50 rounded-lg p-3 border border-blue-100">
+        <div className="flex space-x-4 items-center">
+          <div className="text-lg font-medium">Energie: {totalEnergy.toFixed(0)}/{MAX_ENERGY}</div>
+          <EnergyBar 
+            value={totalEnergy} 
+            maxValue={MAX_ENERGY}
+            className="w-40 h-4"
+          />
+        </div>
+        
+        <div className="flex space-x-4 items-center">
+          <div className="text-lg font-medium">Wissen</div>
+          <div className="w-40 flex items-center">
+            <Progress value={totalKnowledge} className="h-4" />
+            <span className="ml-2">{totalKnowledge.toFixed(0)}%</span>
+          </div>
+        </div>
+        
+        <div className="flex space-x-4 items-center">
+          <div>
+            <span className="font-medium">Neutronen:</span> {neutronCount}
+          </div>
+          <div>
+            <span className="font-medium">Material:</span> 
+            <span className="ml-2">{enrichedUranium.toFixed(1)} kg U</span>
+            <span className="ml-2">{plutoniumAmount.toFixed(1)} kg Pu</span>
+          </div>
+        </div>
+      </div>
+      
       <Tabs value={currentTab} onValueChange={setCurrentTab}>
-        <TabsList className="grid grid-cols-3 mb-4">
-          <TabsTrigger value="fission">Kernspaltung</TabsTrigger>
-          <TabsTrigger value="enrichment">Anreicherung</TabsTrigger>
-          <TabsTrigger value="bomb">Atombombe</TabsTrigger>
+        <TabsList className="grid grid-cols-7 mb-4">
+          <TabsTrigger value="fission" className="flex items-center">
+            <Atom className="h-4 w-4 mr-1" />
+            <span>Kernspaltung</span>
+          </TabsTrigger>
+          <TabsTrigger value="enrichment" className="flex items-center">
+            <Radiation className="h-4 w-4 mr-1" />
+            <span>Anreicherung</span>
+          </TabsTrigger>
+          <TabsTrigger value="bomb" className="flex items-center">
+            <Flame className="h-4 w-4 mr-1" />
+            <span>Atombombe</span>
+          </TabsTrigger>
+          <TabsTrigger value="reactor" className="flex items-center">
+            <Zap className="h-4 w-4 mr-1" />
+            <span>Reaktor</span>
+          </TabsTrigger>
+          <TabsTrigger value="fusion" className="flex items-center">
+            <Flame className="h-4 w-4 mr-1" />
+            <span>Fusion</span>
+          </TabsTrigger>
+          <TabsTrigger value="chain-reaction" className="flex items-center">
+            <BarChart3 className="h-4 w-4 mr-1" />
+            <span>Kettenreaktion</span>
+          </TabsTrigger>
+          <TabsTrigger value="radiation" className="flex items-center">
+            <Flask className="h-4 w-4 mr-1" />
+            <span>Strahlung</span>
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="fission" className="space-y-4">
@@ -193,15 +265,6 @@ export const Game = ({ className }: GameProps) => {
               <Explanation 
                 text={getExplanationForElement(selectedElement, neutronSpeed)} 
               />
-              <div className="flex flex-col space-y-2">
-                <EnergyBar 
-                  value={totalEnergy} 
-                  maxValue={MAX_ENERGY}
-                />
-                <div className="text-center">
-                  <span className="font-medium">Neutronen: {neutronCount}</span>
-                </div>
-              </div>
               
               <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h3 className="font-medium mb-2">Materialübersicht:</h3>
@@ -268,6 +331,72 @@ export const Game = ({ className }: GameProps) => {
             </p>
           </div>
         </TabsContent>
+        
+        <TabsContent value="reactor">
+          <ReactorLab 
+            energy={totalEnergy}
+            onEnergyProduced={handleEnergyProduced}
+          />
+          
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h3 className="font-medium mb-2">Kernreaktoren erklärt:</h3>
+            <p className="text-sm">
+              Kernreaktoren nutzen kontrollierte Kernspaltung, um Wärme zu erzeugen und 
+              Wasser zu erhitzen, das Turbinen antreibt und Elektrizität erzeugt. 
+              Die Reaktion wird durch Steuerstäbe reguliert, die Neutronen absorbieren. 
+              Verschiedene Reaktortypen nutzen unterschiedliche Brennstoffe und Kühlmittel, 
+              haben aber alle das Ziel, eine stabile, kontrollierte Kettenreaktion aufrechtzuerhalten.
+            </p>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="fusion">
+          <FusionLab 
+            energy={totalEnergy}
+            onEnergyProduced={handleEnergyProduced}
+          />
+          
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h3 className="font-medium mb-2">Kernfusion erklärt:</h3>
+            <p className="text-sm">
+              Bei der Kernfusion verschmelzen leichte Atomkerne wie Wasserstoff zu schwereren Kernen 
+              wie Helium und setzen dabei enorme Energiemengen frei. Dieser Prozess treibt Sterne an 
+              und könnte eine nahezu unerschöpfliche, saubere Energiequelle darstellen. 
+              Auf der Erde sind extrem hohe Temperaturen (Millionen Grad) und starke Magnetfelder 
+              nötig, um die elektrostatische Abstoßung zwischen den Kernen zu überwinden.
+            </p>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="chain-reaction">
+          <ChainReactionSimulator />
+          
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h3 className="font-medium mb-2">Kettenreaktionen und exponentielle Prozesse erklärt:</h3>
+            <p className="text-sm">
+              Eine Kettenreaktion entsteht, wenn jede Kernspaltung durchschnittlich mehr als ein 
+              Neutron erzeugt, das weitere Spaltungen auslöst. Der Multiplikationsfaktor k 
+              beschreibt dieses Verhältnis: Bei k &lt; 1 stirbt die Reaktion ab, bei k = 1 bleibt 
+              sie stabil und bei k &gt; 1 wächst sie exponentiell an. Ähnliche exponentielle Muster 
+              finden wir in vielen Bereichen, von der Bevölkerungsentwicklung bis zum Zinseszins.
+            </p>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="radiation">
+          <RadiationEffectsLab />
+          
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h3 className="font-medium mb-2">Strahlung und Materie erklärt:</h3>
+            <p className="text-sm">
+              Ionisierende Strahlung (Alpha, Beta, Gamma und Neutronen) kann Atome ionisieren, 
+              chemische Bindungen aufbrechen und biologisches Gewebe schädigen. In der Medizin 
+              wird sie zur Krebsbehandlung eingesetzt, in der Industrie zur Materialprüfung. 
+              Die Halbwertszeit beschreibt, wie lange radioaktive Stoffe aktiv bleiben, und reicht 
+              von Sekundenbruchteilen bei kurzlebigen Isotopen bis zu Milliarden von Jahren.
+            </p>
+          </div>
+        </TabsContent>
       </Tabs>
       
       <div className="flex justify-center">
@@ -295,9 +424,14 @@ export const Game = ({ className }: GameProps) => {
             <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
               <h3 className="font-medium mb-2">Fortgeschrittene Kernphysik:</h3>
               <p className="text-sm">
-                Hier könnten zusätzliche Experimente und Informationen zur Kernphysik angezeigt werden.
-                Diese Funktion wird in zukünftigen Updates freigeschaltet.
+                Wähle auf den Tabs oben zwischen verschiedenen Laboren, um tiefer in die Kernphysik einzutauchen:
               </p>
+              <ul className="list-disc list-inside mt-2 text-sm space-y-1">
+                <li>Baue und steuere verschiedene Reaktortypen im Reaktor-Labor</li>
+                <li>Entdecke Kernfusion und wie Sterne funktionieren im Fusions-Labor</li>
+                <li>Verstehe die Mathematik hinter Kettenreaktionen im Simulator</li>
+                <li>Erforsche die Auswirkungen von Strahlung auf verschiedene Materialien</li>
+              </ul>
             </div>
           </CollapsibleContent>
         </Collapsible>
