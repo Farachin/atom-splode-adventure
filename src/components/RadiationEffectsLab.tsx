@@ -405,13 +405,15 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         ctx.moveTo(startX, startY);
         
         const crackLength = 5 + Math.random() * 15;
+        let currentX = startX;
+        let currentY = startY;
         
         for (let j = 0; j < crackLength; j++) {
           const angle = Math.random() * Math.PI * 2;
           const segLength = 2 + Math.random() * 3;
           
-          const currentX = startX + Math.cos(angle) * segLength;
-          const currentY = startY + Math.sin(angle) * segLength;
+          currentX += Math.cos(angle) * segLength;
+          currentY += Math.sin(angle) * segLength;
           
           currentX = Math.max(centerX - width/2, Math.min(centerX + width/2, currentX));
           currentY = Math.max(centerY - height/2, Math.min(centerY + height/2, currentY));
