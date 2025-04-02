@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { 
   Atom, 
   Dna, 
-  Flask, 
+  FlaskConical, 
   Zap, 
   Timer, 
   Shield, 
@@ -53,7 +52,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
   const particlesRef = useRef<Array<{x: number, y: number, vx: number, vy: number, size: number, life: number, maxLife: number}>>([]);
   const { toast } = useToast();
 
-  // Initialize experiment
   useEffect(() => {
     resetExperiment();
     initCanvas();
@@ -63,7 +61,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     };
   }, [selectedMaterial, selectedRadiation]);
 
-  // Timer for radiation exposure
   useEffect(() => {
     if (!isExposing) return;
     
@@ -83,7 +80,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     return () => clearInterval(timer);
   }, [isExposing, radiationTime]);
 
-  // Initialize canvas and animation
   const initCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -94,7 +90,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     particlesRef.current = [];
     cancelAnimationFrame(animationRef.current);
     
-    // Start animation loop
     const animate = () => {
       drawRadiationEffect();
       animationRef.current = requestAnimationFrame(animate);
@@ -103,7 +98,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     animationRef.current = requestAnimationFrame(animate);
   };
 
-  // Draw radiation effect on canvas
   const drawRadiationEffect = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -111,46 +105,37 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Create new particles if exposing
     if (isExposing) {
       const effectiveIntensity = Math.max(0, radiationIntensity - shieldingLevel * 0.5);
       const particlesToCreate = Math.round(effectiveIntensity / 10);
       
       for (let i = 0; i < particlesToCreate; i++) {
-        if (Math.random() < 0.3) { // Only create new particles occasionally
+        if (Math.random() < 0.3) {
           createRadiationParticle();
         }
       }
     }
     
-    // Update and draw existing particles
     const particles = particlesRef.current;
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       
-      // Update position
       p.x += p.vx;
       p.y += p.vy;
       
-      // Update lifespan
       p.life--;
       
-      // Remove dead particles
       if (p.life <= 0) {
         particles.splice(i, 1);
         continue;
       }
       
-      // Calculate opacity based on remaining life
       const opacity = p.life / p.maxLife;
       
-      // Draw particle
       ctx.beginPath();
       
-      // Different visuals for different radiation types
       if (selectedRadiation === 'alpha') {
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255, 100, 100, ${opacity})`;
@@ -158,7 +143,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         ctx.arc(p.x, p.y, p.size * 0.6, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(100, 100, 255, ${opacity})`;
       } else if (selectedRadiation === 'gamma') {
-        // Draw zigzag line for gamma
         const startX = p.x - p.vx * 5;
         const startY = p.y - p.vy * 5;
         ctx.moveTo(startX, startY);
@@ -183,7 +167,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       ctx.fill();
     }
     
-    // Draw material being exposed
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     
@@ -198,29 +181,27 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
 
-  // Create a new radiation particle
   const createRadiationParticle = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    // Create particle at edge of canvas and aim toward center
-    const side = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+    const side = Math.floor(Math.random() * 4);
     let x, y;
     
     switch (side) {
-      case 0: // top
+      case 0:
         x = Math.random() * canvas.width;
         y = -5;
         break;
-      case 1: // right
+      case 1:
         x = canvas.width + 5;
         y = Math.random() * canvas.height;
         break;
-      case 2: // bottom
+      case 2:
         x = Math.random() * canvas.width;
         y = canvas.height + 5;
         break;
-      case 3: // left
+      case 3:
         x = -5;
         y = Math.random() * canvas.height;
         break;
@@ -229,7 +210,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         y = 0;
     }
     
-    // Aim toward center
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     
@@ -241,7 +221,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     let sizeFactor = 1;
     let lifeFactor = 1;
     
-    // Different properties for different radiation types
     switch (selectedRadiation) {
       case 'alpha':
         speedFactor = 0.6;
@@ -265,16 +244,14 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         break;
     }
     
-    // Add some randomness to direction
     const randomAngle = (Math.random() - 0.5) * 0.5;
     const vx = (dx / dist) * speedFactor * 2;
     const vy = (dy / dist) * speedFactor * 2;
     
-    // Rotate velocity vector by random angle
     const cosTerm = Math.cos(randomAngle);
     const sinTerm = Math.sin(randomAngle);
     const newVx = vx * cosTerm - vy * sinTerm;
-    const newVy = vx * sinTerm + vy * cosTerm;
+    const newVy = vx * sinTerm + vy * sinTerm;
     
     const maxLife = Math.round(dist * lifeFactor);
     
@@ -289,12 +266,10 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     });
   };
 
-  // Draw DNA helix
   const drawDNA = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number) => {
     const width = 100;
     const height = 150;
     
-    // Draw DNA backbones
     ctx.beginPath();
     ctx.moveTo(centerX - width/2, centerY - height/2);
     ctx.bezierCurveTo(
@@ -312,7 +287,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     ctx.lineWidth = 4;
     ctx.stroke();
     
-    // Draw other backbone
     ctx.beginPath();
     ctx.moveTo(centerX + width/2, centerY - height/2);
     ctx.bezierCurveTo(
@@ -330,13 +304,11 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     ctx.lineWidth = 4;
     ctx.stroke();
     
-    // Draw base pairs
     const numRungs = 10;
     for (let i = 0; i < numRungs; i++) {
       const t = i / (numRungs - 1);
       const y = centerY - height/2 + height * t;
       
-      // Calculate x positions along the bezier curves
       const t1 = Math.sin(t * Math.PI * 2) * 0.5 + 0.5;
       const x1 = centerX - width/2 * t1;
       const x2 = centerX + width/2 * (1 - t1);
@@ -345,7 +317,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       ctx.moveTo(x1, y);
       ctx.lineTo(x2, y);
       
-      // Check for damaged bases
       const isDamaged = dnaStrands.some(strand => 
         strand.damaged.length > i && strand.damaged[i]
       );
@@ -367,16 +338,13 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
 
-  // Draw metal surface
   const drawMetal = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number) => {
     const width = 120;
     const height = 80;
     
-    // Draw metal plate
     ctx.fillStyle = 'rgba(180, 180, 180, 0.9)';
     ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
     
-    // Add some metallic shading
     const gradient = ctx.createLinearGradient(
       centerX - width/2, centerY - height/2,
       centerX + width/2, centerY + height/2
@@ -388,7 +356,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     ctx.fillStyle = gradient;
     ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
     
-    // Draw electrons if emitting
     if (electronEmission > 0) {
       const numElectrons = Math.floor(electronEmission / 10);
       
@@ -404,7 +371,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         ctx.fillStyle = 'rgba(0, 100, 255, 0.8)';
         ctx.fill();
         
-        // Add electron trail
         ctx.beginPath();
         ctx.moveTo(centerX + Math.cos(angle) * 10, centerY + Math.sin(angle) * 10);
         ctx.lineTo(ex, ey);
@@ -415,20 +381,16 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
 
-  // Draw plastic material
   const drawPlastic = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number) => {
     const width = 100;
     const height = 80;
     
-    // Draw plastic sheet
     ctx.fillStyle = 'rgba(230, 230, 250, 0.9)';
     ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
     
-    // Add transparent effect
     ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
     
-    // Add degradation cracks if damaged
     if (materialDegradation > 0) {
       const numCracks = Math.floor(materialDegradation / 10);
       
@@ -442,19 +404,15 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         ctx.beginPath();
         ctx.moveTo(startX, startY);
         
-        // Create jagged crack
-        let currentX = startX;
-        let currentY = startY;
         const crackLength = 5 + Math.random() * 15;
         
         for (let j = 0; j < crackLength; j++) {
           const angle = Math.random() * Math.PI * 2;
           const segLength = 2 + Math.random() * 3;
           
-          currentX += Math.cos(angle) * segLength;
-          currentY += Math.sin(angle) * segLength;
+          const currentX = startX + Math.cos(angle) * segLength;
+          const currentY = startY + Math.sin(angle) * segLength;
           
-          // Keep crack within bounds
           currentX = Math.max(centerX - width/2, Math.min(centerX + width/2, currentX));
           currentY = Math.max(centerY - height/2, Math.min(centerY + height/2, currentY));
           
@@ -464,7 +422,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         ctx.stroke();
       }
       
-      // Add yellowing
       if (materialDegradation > 50) {
         ctx.fillStyle = `rgba(200, 180, 0, ${materialDegradation / 200})`;
         ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
@@ -472,11 +429,9 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
 
-  // Draw crystal structure
   const drawCrystal = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number) => {
     const size = 60;
     
-    // Draw crystal structure (a hexagon)
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
       const angle = i * Math.PI / 3;
@@ -491,16 +446,13 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
     ctx.closePath();
     
-    // Fill with semi-transparent color
     ctx.fillStyle = 'rgba(200, 230, 255, 0.5)';
     ctx.fill();
     
-    // Add outline
     ctx.strokeStyle = 'rgba(100, 150, 200, 0.8)';
     ctx.lineWidth = 2;
     ctx.stroke();
     
-    // Draw internal structure (crystal lattice)
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
       const angle = i * Math.PI / 3;
@@ -516,7 +468,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     ctx.lineWidth = 1;
     ctx.stroke();
     
-    // Add luminescence effect if active
     if (crystalLuminescence > 0) {
       const glow = ctx.createRadialGradient(
         centerX, centerY, 0,
@@ -535,7 +486,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       ctx.fillStyle = glow;
       ctx.fillRect(centerX - size * 1.5, centerY - size * 1.5, size * 3, size * 3);
       
-      // Add some glowing particles
       const numParticles = Math.floor(intensity * 10);
       
       for (let i = 0; i < numParticles; i++) {
@@ -553,7 +503,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
 
-  // Start radiation exposure
   const handleStartExposure = () => {
     if (isExposing) return;
     
@@ -564,7 +513,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       description: `${getRadiationName(selectedRadiation)} Strahlung auf ${getMaterialName(selectedMaterial)}, ${radiationTime} Sekunden.`,
     });
     
-    // Reset material effects
     if (selectedMaterial === 'dna') {
       createInitialDNA();
     } else if (selectedMaterial === 'metal') {
@@ -576,11 +524,9 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
 
-  // Create initial DNA structure
   const createInitialDNA = () => {
     const newStrands: DnaStrand[] = [];
     
-    // Create 3 strands with random sequences
     for (let i = 0; i < 3; i++) {
       const sequence = generateDNASequence(10);
       newStrands.push({
@@ -594,7 +540,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     setDnaStrands(newStrands);
   };
 
-  // Generate random DNA sequence
   const generateDNASequence = (length: number): string => {
     const bases = ['A', 'T', 'G', 'C'];
     let sequence = '';
@@ -606,7 +551,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     return sequence;
   };
 
-  // Finish radiation exposure
   const finishExposure = () => {
     setIsExposing(false);
     applyRadiationEffects();
@@ -617,9 +561,7 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     });
   };
 
-  // Apply radiation effects based on material and radiation type
   const applyRadiationEffects = () => {
-    // Calculate effective radiation dose
     const effectiveIntensity = Math.max(0, radiationIntensity - shieldingLevel * 0.5);
     
     if (selectedMaterial === 'dna') {
@@ -633,16 +575,12 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
 
-  // Apply DNA damage
   const applyDNADamage = (intensity: number) => {
-    // Copy current DNA strands
     const newStrands = [...dnaStrands];
     
-    // Apply damage based on radiation type and intensity
     newStrands.forEach(strand => {
       const damageChance = intensity / 100;
       
-      // Different radiation types affect DNA differently
       let baseDamageMultiplier = 1;
       let baseMutationMultiplier = 1;
       
@@ -665,14 +603,11 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
           break;
       }
       
-      // Apply damage to bases
       for (let i = 0; i < strand.sequence.length; i++) {
-        // Damage chance
         if (Math.random() < damageChance * baseDamageMultiplier / 10) {
           strand.damaged[i] = true;
         }
         
-        // Mutation chance (only if already damaged)
         if (strand.damaged[i] && Math.random() < damageChance * baseMutationMultiplier / 20) {
           strand.mutated[i] = true;
         }
@@ -682,23 +617,21 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     setDnaStrands(newStrands);
   };
 
-  // Apply photoelectric effect to metal
   const applyPhotoelectricEffect = (intensity: number) => {
-    // Gamma and X-rays cause photoelectric effect in metals
     let effectMultiplier = 0;
     
     switch (selectedRadiation) {
       case 'alpha':
-        effectMultiplier = 0.2; // Poor at ejecting electrons
+        effectMultiplier = 0.2;
         break;
       case 'beta':
-        effectMultiplier = 0.8; // Moderate
+        effectMultiplier = 0.8;
         break;
       case 'gamma':
-        effectMultiplier = 1.5; // Best at causing photoelectric effect
+        effectMultiplier = 1.5;
         break;
       case 'neutron':
-        effectMultiplier = 0.1; // Very poor
+        effectMultiplier = 0.1;
         break;
     }
     
@@ -706,9 +639,7 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     setElectronEmission(newEmission);
   };
 
-  // Apply material degradation to plastic
   const applyMaterialDegradation = (intensity: number) => {
-    // Different radiation types damage materials differently
     let degradationMultiplier = 1;
     
     switch (selectedRadiation) {
@@ -719,10 +650,10 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         degradationMultiplier = 0.7;
         break;
       case 'gamma':
-        degradationMultiplier = 2.0; // Gamma rays are very damaging to plastics
+        degradationMultiplier = 2.0;
         break;
       case 'neutron':
-        degradationMultiplier = 3.0; // Neutrons cause severe damage
+        degradationMultiplier = 3.0;
         break;
     }
     
@@ -730,9 +661,7 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     setMaterialDegradation(newDegradation);
   };
 
-  // Apply luminescence to crystal
   const applyCrystalLuminescence = (intensity: number) => {
-    // Different radiation types cause different luminescence patterns
     let luminescenceMultiplier = 1;
     
     switch (selectedRadiation) {
@@ -754,7 +683,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     setCrystalLuminescence(newLuminescence);
   };
 
-  // Reset experiment
   const resetExperiment = () => {
     setIsExposing(false);
     setTimeRemaining(0);
@@ -772,7 +700,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     particlesRef.current = [];
   };
 
-  // Get radiation name in German
   const getRadiationName = (type: RadiationType): string => {
     switch(type) {
       case 'alpha': return 'Alpha';
@@ -783,7 +710,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
 
-  // Get material name in German
   const getMaterialName = (type: MaterialType): string => {
     switch(type) {
       case 'dna': return 'DNA';
@@ -952,7 +878,7 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
                     disabled={isExposing}
                   >
                     <div className="flex items-center">
-                      <Flask className="h-5 w-5 mr-2 text-purple-500" />
+                      <FlaskConical className="h-5 w-5 mr-2 text-purple-500" />
                       <span className="font-bold">Kunststoff</span>
                     </div>
                     <p className="text-xs text-gray-500">Kann durch Strahlung degradieren</p>
