@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Zap } from 'lucide-react';
 
 interface EffectProps {
-  type: 'explosion' | 'neutron-release' | 'energy-release' | 'split-product' | 'beta-decay' | 'neutron-absorption';
+  type: 'explosion' | 'neutron-release' | 'energy-release' | 'split-product' | 'beta-decay' | 'neutron-absorption' | 'dna-damage';
   x: number;
   y: number;
   onComplete?: () => void;
@@ -13,16 +14,19 @@ interface EffectProps {
     x: number;
     y: number;
   };
+  damageLevel?: 'minor' | 'severe' | 'mutation';
 }
 
-export const Effect = ({ type, x, y, onComplete, className, productType, targetPosition }: EffectProps) => {
+export const Effect = ({ type, x, y, onComplete, className, productType, targetPosition, damageLevel }: EffectProps) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(false);
       if (onComplete) onComplete();
-    }, type === 'explosion' ? 800 : type === 'beta-decay' ? 1000 : 500);
+    }, type === 'explosion' ? 800 : 
+       type === 'beta-decay' ? 1000 : 
+       type === 'dna-damage' ? 1500 : 500);
 
     return () => clearTimeout(timer);
   }, [type, onComplete]);
@@ -170,6 +174,34 @@ export const Effect = ({ type, x, y, onComplete, className, productType, targetP
               opacity: 0.7
             }}
           />
+        );
+      case 'dna-damage':
+        const damageColor = damageLevel === 'minor' ? 'from-red-300 to-red-500' : 
+                           damageLevel === 'severe' ? 'from-red-500 to-red-700' : 
+                           'from-purple-400 to-purple-600';
+        const animationClass = damageLevel === 'mutation' ? 'animate-pulse' : 'animate-fade-out';
+        
+        return (
+          <div 
+            className={cn(
+              `absolute rounded-full bg-gradient-to-r ${damageColor} ${animationClass}`,
+              className
+            )}
+            style={{ 
+              left: x - 10, 
+              top: y - 10, 
+              width: '20px', 
+              height: '20px',
+              zIndex: 30,
+              boxShadow: '0 0 8px rgba(255, 50, 50, 0.8)'
+            }}
+          >
+            {damageLevel === 'mutation' && (
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-[10px] font-bold">
+                M
+              </div>
+            )}
+          </div>
         );
       default:
         return null;

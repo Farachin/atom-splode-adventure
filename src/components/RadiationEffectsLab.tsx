@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import Effect from './Effect';
 
 interface RadiationEffectsLabProps {
   className?: string;
@@ -33,6 +34,12 @@ interface DnaStrand {
   sequence: string;
   damaged: boolean[];
   mutated: boolean[];
+  damageEffects: Array<{
+    x: number;
+    y: number;
+    type: 'minor' | 'severe' | 'mutation';
+    active: boolean;
+  }>;
 }
 
 const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) => {
@@ -44,6 +51,7 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
   const [isExposing, setIsExposing] = useState<boolean>(false);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [dnaStrands, setDnaStrands] = useState<DnaStrand[]>([]);
+  const [dnaRungPositions, setDnaRungPositions] = useState<Array<{x1: number, y1: number, x2: number, y2: number}>>([]);
   const [electronEmission, setElectronEmission] = useState<number>(0);
   const [materialDegradation, setMaterialDegradation] = useState<number>(0);
   const [crystalLuminescence, setCrystalLuminescence] = useState<number>(0);
@@ -165,6 +173,11 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       }
       
       ctx.fill();
+      
+      // Prüfen, ob ein Teilchen mit der DNA kollidiert
+      if (selectedMaterial === 'dna' && isExposing) {
+        checkParticleCollisionWithDNA(p);
+      }
     }
     
     const centerX = canvas.width / 2;
@@ -179,6 +192,88 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     } else if (selectedMaterial === 'crystal') {
       drawCrystal(ctx, centerX, centerY);
     }
+  };
+
+  const checkParticleCollisionWithDNA = (particle: {x: number, y: number}) => {
+    if (dnaRungPositions.length === 0) return;
+    
+    // Prüfe Kollision mit DNA-Sprossen
+    for (let i = 0; i < dnaRungPositions.length; i++) {
+      const rung = dnaRungPositions[i];
+      const distanceToline = distancePointToLineSegment(
+        particle.x, particle.y,
+        rung.x1, rung.y1,
+        rung.x2, rung.y2
+      );
+      
+      if (distanceToline < 10) { // Kollisionsradius
+        // Nur manchmal Schaden anrichten, basierend auf Strahlungstyp
+        if (Math.random() < 0.4) {
+          const strandIndex = Math.floor(Math.random() * dnaStrands.length);
+          const strand = dnaStrands[strandIndex];
+          
+          if (!strand.damaged[i]) {
+            const newStrands = [...dnaStrands];
+            newStrands[strandIndex].damaged[i] = true;
+            
+            const midX = (rung.x1 + rung.x2) / 2;
+            const midY = (rung.y1 + rung.y2) / 2;
+            
+            // Füge einen Effekt hinzu, um die Beschädigung zu visualisieren
+            newStrands[strandIndex].damageEffects.push({
+              x: midX,
+              y: midY,
+              type: 'minor',
+              active: true
+            });
+            
+            // Geringe Chance auf Mutation
+            if (Math.random() < 0.2) {
+              newStrands[strandIndex].mutated[i] = true;
+              newStrands[strandIndex].damageEffects[newStrands[strandIndex].damageEffects.length - 1].type = 'mutation';
+            }
+            
+            setDnaStrands(newStrands);
+            
+            // Entferne das Teilchen
+            particle.x = -100;
+            particle.y = -100;
+            particle.life = 0;
+            break;
+          }
+        }
+      }
+    }
+  };
+
+  // Hilfsfunktion zur Berechnung des Abstands von einem Punkt zu einer Linie
+  const distancePointToLineSegment = (px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
+    const A = px - x1;
+    const B = py - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+    
+    const dot = A * C + B * D;
+    const len_sq = C * C + D * D;
+    const param = len_sq !== 0 ? dot / len_sq : -1;
+    
+    let xx, yy;
+    
+    if (param < 0) {
+      xx = x1;
+      yy = y1;
+    } else if (param > 1) {
+      xx = x2;
+      yy = y2;
+    } else {
+      xx = x1 + param * C;
+      yy = y1 + param * D;
+    }
+    
+    const dx = px - xx;
+    const dy = py - yy;
+    
+    return Math.sqrt(dx * dx + dy * dy);
   };
 
   const createRadiationParticle = () => {
@@ -270,6 +365,9 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     const width = 100;
     const height = 150;
     
+    // Berechne DNA-Helixdaten für Kollisionserkennung
+    const rungPositions: Array<{x1: number, y1: number, x2: number, y2: number}> = [];
+    
     ctx.beginPath();
     ctx.moveTo(centerX - width/2, centerY - height/2);
     ctx.bezierCurveTo(
@@ -313,6 +411,9 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       const x1 = centerX - width/2 * t1;
       const x2 = centerX + width/2 * (1 - t1);
       
+      // Speichere Sprossenposition für Kollisionserkennung
+      rungPositions.push({x1, y1: y, x2, y2: y});
+      
       ctx.beginPath();
       ctx.moveTo(x1, y);
       ctx.lineTo(x2, y);
@@ -326,16 +427,61 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       );
       
       if (isMutated) {
+        // Für mutierte DNA-Elemente einen pulsierenden, lila Effekt zeigen
         ctx.strokeStyle = 'rgba(255, 50, 255, 0.9)';
+        
+        // Zusätzliche Visualisierung für Mutationen
+        ctx.shadowColor = 'rgba(255, 50, 255, 0.8)';
+        ctx.shadowBlur = 8;
       } else if (isDamaged) {
+        // Für beschädigte DNA-Elemente einen roten Effekt zeigen
         ctx.strokeStyle = 'rgba(255, 50, 50, 0.9)';
+        
+        // Zusätzliche Visualisierung für Beschädigungen
+        ctx.shadowColor = 'rgba(255, 50, 50, 0.8)';
+        ctx.shadowBlur = 5;
       } else {
         ctx.strokeStyle = isExposing ? 'rgba(50, 200, 50, 0.5)' : 'rgba(50, 200, 50, 0.8)';
+        ctx.shadowBlur = 0;
       }
       
       ctx.lineWidth = 2;
       ctx.stroke();
+      ctx.shadowBlur = 0; // Setze Shadow-Effekt zurück
+      
+      // Zeichne zusätzliche visuelle Effekte für Schäden/Mutationen
+      if (isDamaged || isMutated) {
+        const midX = (x1 + x2) / 2;
+        const midY = y;
+        
+        ctx.beginPath();
+        ctx.arc(midX, midY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = isMutated ? 'rgba(255, 50, 255, 0.9)' : 'rgba(255, 50, 50, 0.9)';
+        ctx.fill();
+      }
     }
+    
+    // Speichere Rung-Positionen für Kollisionserkennung
+    setDnaRungPositions(rungPositions);
+    
+    // Zeichne aktive Schadenseffekte
+    dnaStrands.forEach(strand => {
+      strand.damageEffects.forEach((effect, index) => {
+        if (effect.active) {
+          // Animierte Schadensvisualisierung
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, 5, 0, Math.PI * 2);
+          
+          if (effect.type === 'mutation') {
+            ctx.fillStyle = 'rgba(255, 50, 255, 0.7)';
+          } else {
+            ctx.fillStyle = 'rgba(255, 50, 50, 0.7)';
+          }
+          
+          ctx.fill();
+        }
+      });
+    });
   };
 
   const drawMetal = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number) => {
@@ -535,7 +681,8 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         id: i,
         sequence,
         damaged: new Array(10).fill(false),
-        mutated: new Array(10).fill(false)
+        mutated: new Array(10).fill(false),
+        damageEffects: []
       });
     }
     
@@ -608,10 +755,48 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       for (let i = 0; i < strand.sequence.length; i++) {
         if (Math.random() < damageChance * baseDamageMultiplier / 10) {
           strand.damaged[i] = true;
+          
+          // Wenn Rungpositionen bereits berechnet wurden
+          if (dnaRungPositions.length > i) {
+            const rungPos = dnaRungPositions[i];
+            const midX = (rungPos.x1 + rungPos.x2) / 2;
+            const midY = (rungPos.y1 + rungPos.y2) / 2;
+            
+            // Visuellen Effekt für die Beschädigung hinzufügen
+            strand.damageEffects.push({
+              x: midX,
+              y: midY,
+              type: 'minor',
+              active: true
+            });
+          }
         }
         
         if (strand.damaged[i] && Math.random() < damageChance * baseMutationMultiplier / 20) {
           strand.mutated[i] = true;
+          
+          // Falls ein Schadenseffekt für diesen Index existiert, ändere ihn zu einer Mutation
+          const effectIndex = strand.damageEffects.findIndex(
+            effect => dnaRungPositions.length > i && 
+            Math.abs(effect.x - (dnaRungPositions[i].x1 + dnaRungPositions[i].x2) / 2) < 10 &&
+            Math.abs(effect.y - dnaRungPositions[i].y1) < 10
+          );
+          
+          if (effectIndex >= 0) {
+            strand.damageEffects[effectIndex].type = 'mutation';
+          } else if (dnaRungPositions.length > i) {
+            // Falls kein Effekt existiert, füge einen neuen hinzu
+            const rungPos = dnaRungPositions[i];
+            const midX = (rungPos.x1 + rungPos.x2) / 2;
+            const midY = (rungPos.y1 + rungPos.y2) / 2;
+            
+            strand.damageEffects.push({
+              x: midX,
+              y: midY,
+              type: 'mutation',
+              active: true
+            });
+          }
         }
       }
     });
@@ -720,6 +905,34 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       case 'crystal': return 'Kristall';
       default: return '';
     }
+  };
+
+  // Rendern Sie DNA-Schäden als eigene Komponenten außerhalb des Canvas
+  const renderDNADamageEffects = () => {
+    return dnaStrands.flatMap(strand => 
+      strand.damageEffects
+        .filter(effect => effect.active)
+        .map((effect, idx) => (
+          <Effect 
+            key={`damage-${strand.id}-${idx}`}
+            type="dna-damage"
+            x={effect.x}
+            y={effect.y}
+            damageLevel={effect.type}
+            onComplete={() => {
+              // Effekt nach der Animation entfernen
+              const updatedStrands = [...dnaStrands];
+              const effectIndex = updatedStrands[strand.id].damageEffects.findIndex(
+                (e, i) => i === idx
+              );
+              if (effectIndex >= 0) {
+                updatedStrands[strand.id].damageEffects[effectIndex].active = false;
+                setDnaStrands(updatedStrands);
+              }
+            }}
+          />
+        ))
+    );
   };
 
   return (
@@ -981,6 +1194,9 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
                 ref={canvasRef} 
                 className="w-full h-full"
               />
+              
+              {/* DNA-Schadenseffekte über dem Canvas */}
+              {selectedMaterial === 'dna' && renderDNADamageEffects()}
             </div>
             
             {!isExposing && selectedMaterial === 'dna' && dnaStrands.length > 0 && (
