@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import GameArea from './GameArea';
@@ -196,6 +197,7 @@ export const Game = ({ className }: GameProps) => {
             value={totalEnergy} 
             maxValue={MAX_ENERGY}
             className="w-40 h-4"
+            showMaxValue={false}
           />
         </div>
         
@@ -220,33 +222,33 @@ export const Game = ({ className }: GameProps) => {
       </div>
       
       <Tabs value={currentTab} onValueChange={setCurrentTab}>
-        <TabsList className="grid grid-cols-7 mb-4">
-          <TabsTrigger value="fission" className="flex items-center">
-            <Atom className="h-4 w-4 mr-1" />
+        <TabsList className="w-full grid grid-cols-7 mb-4">
+          <TabsTrigger value="fission" className="flex items-center space-x-1">
+            <Atom className="h-4 w-4" />
             <span>Kernspaltung</span>
           </TabsTrigger>
-          <TabsTrigger value="enrichment" className="flex items-center">
-            <Radiation className="h-4 w-4 mr-1" />
+          <TabsTrigger value="enrichment" className="flex items-center space-x-1">
+            <Radiation className="h-4 w-4" />
             <span>Anreicherung</span>
           </TabsTrigger>
-          <TabsTrigger value="bomb" className="flex items-center">
-            <Flame className="h-4 w-4 mr-1" />
+          <TabsTrigger value="bomb" className="flex items-center space-x-1">
+            <Flame className="h-4 w-4" />
             <span>Atombombe</span>
           </TabsTrigger>
-          <TabsTrigger value="reactor" className="flex items-center">
-            <Zap className="h-4 w-4 mr-1" />
+          <TabsTrigger value="reactor" className="flex items-center space-x-1">
+            <Zap className="h-4 w-4" />
             <span>Reaktor</span>
           </TabsTrigger>
-          <TabsTrigger value="fusion" className="flex items-center">
-            <Flame className="h-4 w-4 mr-1" />
+          <TabsTrigger value="fusion" className="flex items-center space-x-1">
+            <Flame className="h-4 w-4" />
             <span>Fusion</span>
           </TabsTrigger>
-          <TabsTrigger value="chain-reaction" className="flex items-center">
-            <BarChart3 className="h-4 w-4 mr-1" />
+          <TabsTrigger value="chain-reaction" className="flex items-center space-x-1">
+            <BarChart3 className="h-4 w-4" />
             <span>Kettenreaktion</span>
           </TabsTrigger>
-          <TabsTrigger value="radiation" className="flex items-center">
-            <FlaskConical className="h-4 w-4 mr-1" />
+          <TabsTrigger value="radiation" className="flex items-center space-x-1">
+            <FlaskConical className="h-4 w-4" />
             <span>Strahlung</span>
           </TabsTrigger>
         </TabsList>
