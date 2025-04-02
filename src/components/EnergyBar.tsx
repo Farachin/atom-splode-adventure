@@ -15,7 +15,7 @@ export const EnergyBar = ({ value, maxValue, className, showMaxValue = true }: E
   const percentage = Math.min(100, (value / maxValue) * 100);
   
   return (
-    <div className={cn('flex flex-col items-center space-y-2', className)}>
+    <div className={cn('flex flex-col items-center space-y-1', className)}>
       <div className="flex items-center space-x-2">
         <Flame className="w-6 h-6 text-orange-500" />
         <span className="font-bold text-lg">Energie: {value} MeV</span>

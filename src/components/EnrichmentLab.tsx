@@ -132,8 +132,8 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
       newEnrichment *= baseEnrichmentFactor * speedFactor;
     }
     
-    // Cap maximum enrichment at 95%
-    return Math.min(95, newEnrichment);
+    // Cap maximum enrichment at 98% (increased from 95%)
+    return Math.min(98, newEnrichment);
   };
   
   // Calculate how much enriched uranium is produced
@@ -150,24 +150,24 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
     return feedAmount * outputPercentage * instabilityFactor;
   };
 
-  // Helper function to generate centrifuges - limit to 5 max
+  // Helper function to generate centrifuges - increase to max 10
   const renderCentrifuges = () => {
     const centrifuges = [];
-    const maxCentrifuges = Math.min(5, centrifugeCount);
+    const maxVisibleCentrifuges = Math.min(10, centrifugeCount);
     
-    for (let i = 0; i < maxCentrifuges; i++) {
+    for (let i = 0; i < maxVisibleCentrifuges; i++) {
       centrifuges.push(
         <div key={i} className="relative">
           <div className={cn(
-            "w-16 h-16 bg-gray-200 rounded-full border-4 border-gray-400 mx-auto",
+            "w-12 h-12 bg-gray-200 rounded-full border-4 border-gray-400 mx-auto",
             processRunning ? `animate-spin-${centrifugeSpeed}` : ""
           )}>
             <div className="absolute inset-0 flex items-center justify-center text-xs font-bold">
               {Math.min(99, Math.floor(enrichmentLevel * (i+1)/centrifugeCount))}%
             </div>
           </div>
-          {i < maxCentrifuges - 1 && 
-            <div className="w-6 h-2 bg-gray-400 mx-auto"></div>
+          {i < maxVisibleCentrifuges - 1 && 
+            <div className="w-4 h-1 bg-gray-400 mx-auto"></div>
           }
         </div>
       );
@@ -223,10 +223,15 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
               <span className="text-center">Natururan</span>
             </div>
             
-            {/* Centrifuge animation - limited to 5 */}
-            <div className="flex flex-row items-center justify-center space-x-2 mb-4">
+            {/* Centrifuge animation - now supports up to 10 */}
+            <div className="flex flex-row items-center justify-center space-x-1 mb-4 overflow-x-auto max-w-full">
               {renderCentrifuges()}
             </div>
+            {centrifugeCount > 10 && (
+              <div className="text-xs text-gray-500 mb-2">
+                +{centrifugeCount - 10} weitere Zentrifugen
+              </div>
+            )}
             
             {/* Output containers with improved visuals */}
             <div className="flex justify-between w-full">
@@ -270,7 +275,7 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
                 disabled={processRunning}
                 value={[centrifugeCount]} 
                 min={1} 
-                max={5} // Changed from 10 to 5
+                max={20} 
                 step={1}
                 onValueChange={(value) => setCentrifugeCount(value[0])}
                 className="mt-2"
@@ -326,7 +331,7 @@ export const EnrichmentLab = ({ onEnrichedUraniumCreated, className }: Enrichmen
                 <span className="text-sm font-bold">{enrichmentLevel.toFixed(1)}% U-235</span>
               </div>
               <Progress 
-                value={(enrichmentLevel / 95) * 100} 
+                value={(enrichmentLevel / 98) * 100} 
                 className={cn(
                   "h-2 mt-1",
                   enrichmentLevel >= 90 ? "bg-red-200" : "bg-blue-200"
