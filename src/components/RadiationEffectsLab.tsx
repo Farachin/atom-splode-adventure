@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -116,48 +115,42 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   
-  // Reset dose when changing material
   useEffect(() => {
     setCumDose(0);
     setDamageLevel(0);
     setShowEffects(false);
   }, [activeTab]);
   
-  // Reset effects when changing radiation type
   useEffect(() => {
     setShowEffects(false);
   }, [selectedRadiation]);
   
-  // Animation and effects handling
   useEffect(() => {
     const material = activeTab as MaterialType;
     
     if (isRadiating) {
-      // Calculate penetration based on radiation and material
       const penetration = radiationProperties[selectedRadiation].penetration;
       const materialResistance = materialProperties[material].resistance;
       
-      // Calculate how much radiation actually affects the material
       const effectiveDose = (radiationDose * penetration * (100 - materialResistance)) / 10000;
       
-      // Accumulate dose
       const newCumDose = cumDose + effectiveDose;
       setCumDose(newCumDose);
       
-      // Calculate damage level (non-linear)
       const newDamage = Math.min(100, Math.pow(newCumDose / 10, 1.5));
       setDamageLevel(newDamage);
       
-      // Show effects after threshold
       if (newDamage > 20 && !showEffects) {
         setShowEffects(true);
       }
       
-      // Draw the visualization
       drawVisualization();
       
-      // Create animation loop
-      animationRef.current = requestAnimationFrame(() => setIsRadiating(true));
+      animationRef.current = requestAnimationFrame(() => {
+        setTimeout(() => {
+          setIsRadiating(true);
+        }, 200);
+      });
     } else if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
@@ -169,7 +162,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     };
   }, [isRadiating, selectedRadiation, radiationDose, cumDose, activeTab, showEffects]);
   
-  // Draw the visualization
   const drawVisualization = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -177,14 +169,11 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Set canvas dimensions
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
     
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw based on selected material
     switch (activeTab as MaterialType) {
       case 'dna':
         drawDNA(ctx, canvas.width, canvas.height);
@@ -200,44 +189,104 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         break;
     }
     
-    // Draw radiation particles if radiating
     if (isRadiating) {
       drawRadiationParticles(ctx, canvas.width, canvas.height);
     }
   };
   
-  // Start radiation
-  const startRadiation = () => {
-    setIsRadiating(true);
-  };
-  
-  // Stop radiation
-  const stopRadiation = () => {
-    setIsRadiating(false);
-  };
-  
-  // Reset experiment
-  const resetExperiment = () => {
-    setIsRadiating(false);
-    setCumDose(0);
-    setDamageLevel(0);
-    setShowEffects(false);
+  const drawRadiationParticles = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const particleCount = Math.ceil(radiationDose / 10);
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const maxDistance = Math.min(width, height) * 0.4;
     
-    // Redraw visualization
-    drawVisualization();
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = maxDistance + 50 + Math.random() * 50;
+      const startX = centerX + Math.cos(angle) * distance;
+      const startY = centerY + Math.sin(angle) * distance;
+      
+      const targetAngle = angle + (Math.random() - 0.5) * 0.5;
+      const targetDistance = Math.random() * maxDistance * 0.8;
+      const targetX = centerX + Math.cos(targetAngle) * targetDistance;
+      const targetY = centerY + Math.sin(targetAngle) * targetDistance;
+      
+      const properties = radiationProperties[selectedRadiation];
+      
+      const now = Date.now();
+      const seed = i * 1000 + now / 150;
+      const progress = (Math.sin(seed / 1000) + 1) / 4;
+      
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(targetX, targetY);
+      ctx.strokeStyle = `rgba(${hexToRgb(properties.color)}, 0.4)`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      const particleX = startX + (targetX - startX) * progress;
+      const particleY = startY + (targetY - startY) * progress;
+      
+      ctx.beginPath();
+      ctx.arc(particleX, particleY, 5, 0, Math.PI * 2);
+      ctx.fillStyle = properties.color;
+      ctx.fill();
+      
+      const glow = ctx.createRadialGradient(
+        particleX, particleY, 0,
+        particleX, particleY, 12
+      );
+      glow.addColorStop(0, properties.color);
+      glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      
+      ctx.beginPath();
+      ctx.arc(particleX, particleY, 12, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+      
+      ctx.font = "bold 14px Arial";
+      ctx.fillStyle = 'white';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      
+      ctx.beginPath();
+      ctx.arc(particleX, particleY, 10, 0, Math.PI * 2);
+      ctx.fillStyle = properties.color;
+      ctx.fill();
+      
+      ctx.fillStyle = 'white';
+      ctx.fillText(properties.symbol, particleX, particleY);
+      
+      if (progress > 0.05) {
+        const trailLength = 3;
+        for (let t = 1; t <= trailLength; t++) {
+          const trailProgress = Math.max(0, progress - (t * 0.05));
+          const trailX = startX + (targetX - startX) * trailProgress;
+          const trailY = startY + (targetY - startY) * trailProgress;
+          
+          ctx.beginPath();
+          ctx.arc(
+            trailX,
+            trailY,
+            5 - t,
+            0,
+            Math.PI * 2
+          );
+          ctx.fillStyle = `rgba(${hexToRgb(properties.color)}, ${0.3 - (t * 0.08)})`;
+          ctx.fill();
+        }
+      }
+    }
   };
   
-  // Draw DNA visualization with 3D helix effect
   const drawDNA = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const centerX = width / 2;
     const centerY = height / 2;
     
-    // Draw DNA helix
     const helixWidth = Math.min(width * 0.3, 150);
     const helixHeight = height * 0.7;
     const startY = (height - helixHeight) / 2;
     
-    // Draw the backbone
     const numSteps = 20;
     const stepHeight = helixHeight / numSteps;
     
@@ -245,7 +294,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       const y = startY + i * stepHeight;
       const phase = i / 2;
       
-      // Left backbone
       const leftX1 = centerX - helixWidth / 2 * Math.cos(phase);
       const leftX2 = centerX - helixWidth / 2 * Math.cos(phase + 0.5);
       
@@ -256,7 +304,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       ctx.lineWidth = 4;
       ctx.stroke();
       
-      // Right backbone
       const rightX1 = centerX + helixWidth / 2 * Math.cos(phase);
       const rightX2 = centerX + helixWidth / 2 * Math.cos(phase + 0.5);
       
@@ -267,7 +314,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       ctx.lineWidth = 4;
       ctx.stroke();
       
-      // Base pairs
       ctx.beginPath();
       ctx.moveTo(leftX1, y);
       ctx.lineTo(rightX1, y);
@@ -275,32 +321,26 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       ctx.lineWidth = 2;
       ctx.stroke();
       
-      // Add nucleotide bases (circles)
       const baseColors = ['#f59e0b', '#ef4444', '#10b981', '#8b5cf6'];
       
-      // Left base
       ctx.beginPath();
       ctx.arc(leftX1, y, 6, 0, Math.PI * 2);
       ctx.fillStyle = baseColors[i % 4];
       ctx.fill();
       
-      // Right base
       ctx.beginPath();
       ctx.arc(rightX1, y, 6, 0, Math.PI * 2);
       ctx.fillStyle = baseColors[(i + 2) % 4];
       ctx.fill();
     }
     
-    // Draw damage effects
     if (showEffects) {
-      // Strand breaks
       const breakCount = Math.floor(damageLevel / 20);
       for (let i = 0; i < breakCount; i++) {
         const breakYPos = startY + (Math.random() * 0.8 + 0.1) * helixHeight;
         const side = Math.random() > 0.5 ? 1 : -1;
         const breakX = centerX + side * helixWidth / 2 * Math.cos(breakYPos / stepHeight);
         
-        // Break visualization
         ctx.beginPath();
         ctx.arc(breakX, breakYPos, 10, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(239, 68, 68, 0.5)';
@@ -318,31 +358,26 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
   
-  // Draw metal visualization
   const drawMetal = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const centerX = width / 2;
     const centerY = height / 2;
     
-    // Draw metal lattice
     const gridSize = 30;
     const numRows = Math.floor(height * 0.7 / gridSize);
     const numCols = Math.floor(width * 0.7 / gridSize);
     const startX = centerX - (numCols * gridSize) / 2;
     const startY = centerY - (numRows * gridSize) / 2;
     
-    // Draw lattice points
     for (let row = 0; row < numRows; row++) {
       for (let col = 0; col < numCols; col++) {
         const x = startX + col * gridSize;
         const y = startY + row * gridSize;
         
-        // Lattice point
         ctx.beginPath();
         ctx.arc(x, y, 5, 0, Math.PI * 2);
         ctx.fillStyle = '#6b7280';
         ctx.fill();
         
-        // Distorted lattice for damage
         if (showEffects && Math.random() < damageLevel / 200) {
           ctx.beginPath();
           ctx.arc(
@@ -356,7 +391,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
           ctx.fill();
         }
         
-        // Connect lattice points
         if (col < numCols - 1) {
           ctx.beginPath();
           ctx.moveTo(x, y);
@@ -377,7 +411,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       }
     }
     
-    // Draw electrons if showing effects for metal
     if (showEffects) {
       const electronCount = Math.floor(damageLevel / 5);
       
@@ -392,7 +425,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         ctx.fillStyle = '#3b82f6';
         ctx.fill();
         
-        // Add electron trail
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.lineTo(
@@ -406,12 +438,10 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
   
-  // Draw plastic visualization
   const drawPlastic = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const centerX = width / 2;
     const centerY = height / 2;
     
-    // Draw polymer chains
     const chainCount = 7;
     const chainSpacing = height * 0.6 / chainCount;
     const chainLength = width * 0.6;
@@ -421,19 +451,15 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     for (let i = 0; i < chainCount; i++) {
       const y = startY + i * chainSpacing;
       
-      // Draw polymer backbone
       const segments = 20;
       const segmentLength = chainLength / segments;
       
       for (let j = 0; j < segments; j++) {
         const x = startX + j * segmentLength;
         
-        // Backbone
         ctx.beginPath();
         if (showEffects && damageLevel > 40 && Math.random() < damageLevel / 300) {
-          // Break in chain to show damage
           if (j > 0 && j < segments - 1) {
-            // Draw break
             ctx.moveTo(x - segmentLength, y);
             ctx.lineTo(x - segmentLength / 3, y);
             ctx.moveTo(x + segmentLength / 3, y);
@@ -450,7 +476,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         ctx.lineWidth = 2;
         ctx.stroke();
         
-        // Add side groups every other segment
         if (j % 2 === 0) {
           const sideLength = chainSpacing * 0.4;
           ctx.beginPath();
@@ -460,7 +485,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
           ctx.lineWidth = 1;
           ctx.stroke();
           
-          // Side group "molecule"
           ctx.beginPath();
           ctx.arc(x, y - sideLength, 3, 0, Math.PI * 2);
           ctx.fillStyle = '#60a5fa';
@@ -469,16 +493,13 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       }
     }
     
-    // Draw damage effects for plastic
     if (showEffects) {
-      // Discoloration and cracking
       const crackCount = Math.floor(damageLevel / 15);
       
       for (let i = 0; i < crackCount; i++) {
         const x = startX + Math.random() * chainLength;
         const y = startY + Math.random() * (chainCount * chainSpacing);
         
-        // Draw crack
         const crackLength = 10 + Math.random() * 20;
         const angle = Math.random() * Math.PI;
         
@@ -492,7 +513,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
         ctx.lineWidth = 1;
         ctx.stroke();
         
-        // Discoloration
         ctx.beginPath();
         ctx.arc(x, y, 8, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(244, 114, 182, 0.2)';
@@ -501,15 +521,12 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
   
-  // Draw crystal visualization
   const drawCrystal = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const centerX = width / 2;
     const centerY = height / 2;
     
-    // Draw crystal lattice
     const crystalSize = Math.min(width, height) * 0.4;
     
-    // Base crystal shape
     ctx.beginPath();
     ctx.moveTo(centerX, centerY - crystalSize / 2);
     ctx.lineTo(centerX + crystalSize / 2, centerY);
@@ -517,10 +534,8 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     ctx.lineTo(centerX - crystalSize / 2, centerY);
     ctx.closePath();
     
-    // Crystal fill based on damage level
     let crystalFill;
     if (showEffects) {
-      // Create a gradient that gets more intense with damage
       const intensity = Math.min(0.8, damageLevel / 100);
       crystalFill = ctx.createRadialGradient(
         centerX, centerY, 10,
@@ -539,7 +554,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     ctx.lineWidth = 2;
     ctx.stroke();
     
-    // Draw inner crystal structure
     const innerSize = crystalSize * 0.6;
     ctx.beginPath();
     ctx.moveTo(centerX, centerY - innerSize / 2);
@@ -551,7 +565,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     ctx.lineWidth = 1;
     ctx.stroke();
     
-    // Draw crystalline planes
     ctx.beginPath();
     ctx.moveTo(centerX - innerSize / 2, centerY);
     ctx.lineTo(centerX + innerSize / 2, centerY);
@@ -561,18 +574,14 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     ctx.lineWidth = 1;
     ctx.stroke();
     
-    // Draw glowing if showing effects
     if (showEffects) {
-      // Add glowing particles
       const particleCount = Math.floor(damageLevel / 5);
       for (let i = 0; i < particleCount; i++) {
-        // Random position within crystal
         const angle = Math.random() * Math.PI * 2;
         const distance = Math.random() * innerSize / 2;
         const x = centerX + Math.cos(angle) * distance;
         const y = centerY + Math.sin(angle) * distance;
         
-        // Glow effect
         const glow = ctx.createRadialGradient(
           x, y, 0,
           x, y, 5 + Math.random() * 5
@@ -588,59 +597,6 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     }
   };
   
-  // Draw radiation particles
-  const drawRadiationParticles = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    const particleCount = Math.ceil(radiationDose / 10);
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const maxDistance = Math.min(width, height) * 0.4;
-    
-    for (let i = 0; i < particleCount; i++) {
-      // Generate random position outside target
-      const angle = Math.random() * Math.PI * 2;
-      const distance = maxDistance + 50 + Math.random() * 50;
-      const startX = centerX + Math.cos(angle) * distance;
-      const startY = centerY + Math.sin(angle) * distance;
-      
-      // Target position with some variance
-      const targetAngle = angle + (Math.random() - 0.5) * 0.5;
-      const targetDistance = Math.random() * maxDistance * 0.8;
-      const targetX = centerX + Math.cos(targetAngle) * targetDistance;
-      const targetY = centerY + Math.sin(targetAngle) * targetDistance;
-      
-      // Get particle properties
-      const properties = radiationProperties[selectedRadiation];
-      
-      // Draw particle path
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.lineTo(targetX, targetY);
-      ctx.strokeStyle = `rgba(${hexToRgb(properties.color)}, 0.3)`;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      
-      // Draw particle
-      ctx.beginPath();
-      ctx.arc(
-        startX + (targetX - startX) * 0.7,
-        startY + (targetY - startY) * 0.7,
-        3,
-        0,
-        Math.PI * 2
-      );
-      ctx.fillStyle = properties.color;
-      ctx.fill();
-      
-      // Draw symbol at end point
-      ctx.font = "bold 10px Arial";
-      ctx.fillStyle = properties.color;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(properties.symbol, targetX, targetY);
-    }
-  };
-  
-  // Helper function to convert hex to rgb for opacity
   const hexToRgb = (hex: string): string => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
