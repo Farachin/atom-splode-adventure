@@ -33,17 +33,16 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
   const [reactorState, setReactorState] = useState<ReactorState>('idle');
   const [halfLife, setHalfLife] = useState<number>(5); // in time steps
   const [isDecayMode, setIsDecayMode] = useState<boolean>(false);
+  const [decayDuration, setDecayDuration] = useState<number>(100); // total duration to simulate
   const simulationRef = useRef<NodeJS.Timeout | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const neutronElementsRef = useRef<HTMLDivElement[]>([]);
   const { toast } = useToast();
 
-  // Initialize chart data
   const [chartData, setChartData] = useState<Array<{ step: number; neutrons: number }>>([
     { step: 0, neutrons: 0 }
   ]);
 
-  // Effect for simulation
   useEffect(() => {
     if (!isSimulating) return;
 
@@ -66,14 +65,12 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     };
   }, [isSimulating, simulationSpeed, kFactor, isDecayMode, halfLife]);
 
-  // Effect for neutron visualization
   useEffect(() => {
     if (canvasRef.current) {
       drawNeutronVisualization();
     }
   }, [neutronCount, currentStep]);
 
-  // Determine reactor state based on k factor
   useEffect(() => {
     if (kFactor < 0.99) {
       setReactorState('subcritical');
@@ -84,24 +81,19 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     }
   }, [kFactor]);
 
-  // Start chain reaction simulation
   const handleStartSimulation = () => {
     if (isSimulating) return;
     
-    // Reset simulation if restarting
     if (currentStep > 0) {
       resetSimulation();
     }
     
-    // Set initial neutron count based on user input
     const newNeutronCount = [...neutronCount];
     newNeutronCount[0] = initialNeutrons;
     setNeutronCount(newNeutronCount);
     
-    // Update chart data with initial value
     setChartData([{ step: 0, neutrons: initialNeutrons }]);
     
-    // Start simulation
     setIsSimulating(true);
     
     toast({
@@ -112,7 +104,6 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     });
   };
 
-  // Stop the simulation
   const handleStopSimulation = () => {
     if (!isSimulating) return;
     setIsSimulating(false);
@@ -127,7 +118,6 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     });
   };
 
-  // Reset the simulation
   const resetSimulation = () => {
     setIsSimulating(false);
     setCurrentStep(0);
@@ -139,28 +129,22 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     }
   };
 
-  // Simulate one step of chain reaction
   const simulateChainReaction = () => {
     const prevNeutrons = neutronCount[neutronCount.length - 1];
     
-    // Formula: new neutrons = previous neutrons * k factor
     let newNeutrons = Math.round(prevNeutrons * kFactor);
     
-    // Add some randomness to make it more interesting
-    const randomFactor = 0.9 + Math.random() * 0.2; // +/- 10%
+    const randomFactor = 0.9 + Math.random() * 0.2;
     newNeutrons = Math.round(newNeutrons * randomFactor);
     
-    // Ensure we have at least 0 neutrons
     newNeutrons = Math.max(0, newNeutrons);
     
-    // Add new data points
     const updatedNeutronCount = [...neutronCount, newNeutrons];
     setNeutronCount(updatedNeutronCount);
     
     const updatedChartData = [...chartData, { step: currentStep + 1, neutrons: newNeutrons }];
     setChartData(updatedChartData);
     
-    // Limit data points to keep performance
     if (updatedNeutronCount.length > 50) {
       setNeutronCount(updatedNeutronCount.slice(updatedNeutronCount.length - 50));
     }
@@ -169,7 +153,6 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
       setChartData(updatedChartData.slice(updatedChartData.length - 100));
     }
     
-    // Check if we need to stop (e.g., if too many neutrons or died out)
     if (newNeutrons > 1000000) {
       handleStopSimulation();
       toast({
@@ -186,32 +169,29 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     }
   };
 
-  // Simulate radioactive decay
   const simulateDecay = () => {
     const prevNeutrons = neutronCount[neutronCount.length - 1];
     
-    // Formula: N(t) = N₀ × (1/2)^(t/t₁/₂)
     const decayFactor = Math.pow(0.5, 1 / halfLife);
     let newNeutrons = Math.round(prevNeutrons * decayFactor);
     
-    // Add new data points
     const updatedNeutronCount = [...neutronCount, newNeutrons];
     setNeutronCount(updatedNeutronCount);
     
     const updatedChartData = [...chartData, { step: currentStep + 1, neutrons: newNeutrons }];
     setChartData(updatedChartData);
     
-    // Limit data points to keep performance
     if (updatedNeutronCount.length > 50) {
       setNeutronCount(updatedNeutronCount.slice(updatedNeutronCount.length - 50));
     }
     
-    if (updatedChartData.length > 100) {
-      setChartData(updatedChartData.slice(updatedChartData.length - 100));
-    }
-    
-    // Check if we need to stop
-    if (newNeutrons < 1 && prevNeutrons > 0) {
+    if (currentStep >= decayDuration) {
+      handleStopSimulation();
+      toast({
+        title: "Zerfallsprozess abgeschlossen",
+        description: `Simulation über ${decayDuration} Zeitschritte abgeschlossen.`,
+      });
+    } else if (newNeutrons < 1 && prevNeutrons > 0) {
       handleStopSimulation();
       toast({
         title: "Zerfallsprozess abgeschlossen",
@@ -220,7 +200,6 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     }
   };
 
-  // Draw neutron visualization on canvas
   const drawNeutronVisualization = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -228,21 +207,16 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Set canvas size
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
     
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Get current neutron count
     const currentNeutrons = neutronCount[neutronCount.length - 1] || 0;
     
-    // Cap the number of neutrons to visualize
     const maxVisualNeutrons = 200;
     const visualNeutrons = Math.min(currentNeutrons, maxVisualNeutrons);
     
-    // Draw neutrons
     for (let i = 0; i < visualNeutrons; i++) {
       const x = Math.random() * canvas.width;
       const y = Math.random() * canvas.height;
@@ -254,7 +228,6 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
       ctx.fill();
     }
     
-    // If there are many more neutrons than visualized, show a notification
     if (currentNeutrons > maxVisualNeutrons) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(10, 10, 180, 30);
@@ -264,7 +237,6 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     }
   };
 
-  // Get the state color for UI elements
   const getStateColor = () => {
     switch (reactorState) {
       case 'subcritical': return 'text-blue-500';
@@ -274,7 +246,6 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     }
   };
 
-  // Format large numbers for display
   const formatNumber = (num: number): string => {
     if (num >= 1000000) {
       return `${(num / 1000000).toFixed(2)}M`;
@@ -359,6 +330,21 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
                       disabled={isSimulating}
                     />
                   </div>
+                  
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span>Simulationsdauer</span>
+                      <span>{decayDuration} Zeitschritte</span>
+                    </div>
+                    <Slider
+                      value={[decayDuration]}
+                      onValueChange={values => setDecayDuration(values[0])}
+                      min={20}
+                      max={200}
+                      step={10}
+                      disabled={isSimulating}
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -386,14 +372,14 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
                       value={[kFactor * 100]}
                       onValueChange={values => setKFactor(values[0] / 100)}
                       min={80}
-                      max={120}
+                      max={200}
                       step={1}
                       disabled={isSimulating}
                     />
                     <div className="flex justify-between mt-1 text-xs text-gray-500">
                       <span>0.8</span>
                       <span>1.0</span>
-                      <span>1.2</span>
+                      <span>2.0</span>
                     </div>
                     
                     <div className="mt-2 flex items-center">
@@ -543,15 +529,16 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
               {isDecayMode ? (
                 <p>
                   Die Halbwertszeit ist die Zeit, nach der die Hälfte aller radioaktiven Atome zerfallen ist. 
-                  Sie reicht von Sekundenbruchteilen bei instabilen Isotopen bis zu Milliarden von Jahren bei 
-                  stabilen Isotopen wie Uran-238.
+                  Nach 2 Halbwertszeiten ist nur noch 1/4, nach 3 Halbwertszeiten nur noch 1/8 der ursprünglichen Menge übrig.
+                  Bei dieser Simulation kannst du den Verlauf über viele Halbwertszeiten beobachten.
                 </p>
               ) : (
                 <p>
                   Der Multiplikationsfaktor k bestimmt das Reaktorverhalten:<br />
                   • k &lt; 1: Reaktion stirbt ab (unterkritisch)<br />
                   • k = 1: Stabile Reaktion (kritisch)<br />
-                  • k &gt; 1: Unkontrollierte Kettenreaktion (überkritisch)
+                  • k &gt; 1: Unkontrollierte Kettenreaktion (überkritisch)<br />
+                  • Bei k = 2: Jede Spaltung erzeugt 2 neue Neutronen (wie bei einer Kernwaffe)
                 </p>
               )}
             </div>

@@ -1,27 +1,33 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
 import { 
-  Atom, 
-  Dna, 
-  FlaskConical, 
+  Activity, 
   Zap, 
-  Timer, 
-  Shield, 
-  BellRing,
-  Microscope,
-  Loader2,
-  Backpack,
-  Hand
+  Radiation,
+  Sparkles,
+  CircleOff,
+  HelpCircle
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import Effect from './Effect';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface RadiationEffectsLabProps {
   className?: string;
@@ -30,1248 +36,848 @@ interface RadiationEffectsLabProps {
 type RadiationType = 'alpha' | 'beta' | 'gamma' | 'neutron';
 type MaterialType = 'dna' | 'metal' | 'plastic' | 'crystal';
 
-interface DnaStrand {
-  id: number;
-  sequence: string;
-  damaged: boolean[];
-  mutated: boolean[];
-  damageEffects: Array<{
-    x: number;
-    y: number;
-    type: 'minor' | 'severe' | 'mutation';
-    active: boolean;
-  }>;
+interface RadiationProperties {
+  symbol: string;
+  penetration: number;
+  ionization: number;
+  color: string;
+  description: string;
 }
 
-const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) => {
-  const [selectedRadiation, setSelectedRadiation] = useState<RadiationType>('gamma');
-  const [selectedMaterial, setSelectedMaterial] = useState<MaterialType>('dna');
-  const [radiationIntensity, setRadiationIntensity] = useState<number>(50);
-  const [radiationTime, setRadiationTime] = useState<number>(5); // in seconds
-  const [shieldingLevel, setShieldingLevel] = useState<number>(0);
-  const [isExposing, setIsExposing] = useState<boolean>(false);
-  const [timeRemaining, setTimeRemaining] = useState<number>(0);
-  const [dnaStrands, setDnaStrands] = useState<DnaStrand[]>([]);
-  const [dnaRungPositions, setDnaRungPositions] = useState<Array<{x1: number, y1: number, x2: number, y2: number}>>([]);
-  const [electronEmission, setElectronEmission] = useState<number>(0);
-  const [materialDegradation, setMaterialDegradation] = useState<number>(0);
-  const [crystalLuminescence, setCrystalLuminescence] = useState<number>(0);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>(0);
-  const particlesRef = useRef<Array<{x: number, y: number, vx: number, vy: number, size: number, life: number, maxLife: number}>>([]);
-  const { toast } = useToast();
+const radiationProperties: Record<RadiationType, RadiationProperties> = {
+  alpha: {
+    symbol: 'α',
+    penetration: 10,
+    ionization: 90,
+    color: '#f87171',
+    description: 'Heliumkerne (α) - Geringe Reichweite, hohe Ionisationskraft'
+  },
+  beta: {
+    symbol: 'β',
+    penetration: 40,
+    ionization: 50,
+    color: '#60a5fa',
+    description: 'Elektronen (β) - Mittlere Reichweite, mittlere Ionisationskraft'
+  },
+  gamma: {
+    symbol: 'γ',
+    penetration: 95,
+    ionization: 20,
+    color: '#34d399',
+    description: 'Energiereiche Photonen (γ) - Hohe Reichweite, geringe Ionisationskraft'
+  },
+  neutron: {
+    symbol: 'n',
+    penetration: 80,
+    ionization: 30,
+    color: '#f59e0b',
+    description: 'Neutronen (n) - Hohe Reichweite, können Kerne umwandeln'
+  }
+};
 
+interface MaterialProperties {
+  resistance: number;
+  effect: string;
+  description: string;
+}
+
+const materialProperties: Record<MaterialType, MaterialProperties> = {
+  dna: {
+    resistance: 15,
+    effect: 'Strangbruch',
+    description: 'DNA ist sehr empfindlich gegenüber Strahlung, die Mutation und Schäden verursachen kann.'
+  },
+  metal: {
+    resistance: 70,
+    effect: 'Materialermüdung',
+    description: 'Metalle widerstehen Strahlung gut, können aber bei hoher Dosis spröde werden.'
+  },
+  plastic: {
+    resistance: 30,
+    effect: 'Versprödung',
+    description: 'Kunststoffe können durch Strahlung brüchig werden und ihre Struktur verlieren.'
+  },
+  crystal: {
+    resistance: 50,
+    effect: 'Farbzentren',
+    description: 'Kristalle können Farbzentren bilden und durch Strahlung zum Leuchten gebracht werden.'
+  }
+};
+
+const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) => {
+  const [activeTab, setActiveTab] = useState('dna');
+  const [selectedRadiation, setSelectedRadiation] = useState<RadiationType>('alpha');
+  const [radiationDose, setRadiationDose] = useState(50);
+  const [isRadiating, setIsRadiating] = useState(false);
+  const [cumDose, setCumDose] = useState(0);
+  const [damageLevel, setDamageLevel] = useState(0);
+  const [showEffects, setShowEffects] = useState(false);
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number | null>(null);
+  
+  // Reset dose when changing material
   useEffect(() => {
-    resetExperiment();
-    initCanvas();
+    setCumDose(0);
+    setDamageLevel(0);
+    setShowEffects(false);
+  }, [activeTab]);
+  
+  // Reset effects when changing radiation type
+  useEffect(() => {
+    setShowEffects(false);
+  }, [selectedRadiation]);
+  
+  // Animation and effects handling
+  useEffect(() => {
+    const material = activeTab as MaterialType;
+    
+    if (isRadiating) {
+      // Calculate penetration based on radiation and material
+      const penetration = radiationProperties[selectedRadiation].penetration;
+      const materialResistance = materialProperties[material].resistance;
+      
+      // Calculate how much radiation actually affects the material
+      const effectiveDose = (radiationDose * penetration * (100 - materialResistance)) / 10000;
+      
+      // Accumulate dose
+      const newCumDose = cumDose + effectiveDose;
+      setCumDose(newCumDose);
+      
+      // Calculate damage level (non-linear)
+      const newDamage = Math.min(100, Math.pow(newCumDose / 10, 1.5));
+      setDamageLevel(newDamage);
+      
+      // Show effects after threshold
+      if (newDamage > 20 && !showEffects) {
+        setShowEffects(true);
+      }
+      
+      // Draw the visualization
+      drawVisualization();
+      
+      // Create animation loop
+      animationRef.current = requestAnimationFrame(() => setIsRadiating(true));
+    } else if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
     
     return () => {
-      cancelAnimationFrame(animationRef.current);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
     };
-  }, [selectedMaterial, selectedRadiation]);
-
-  useEffect(() => {
-    if (!isExposing) return;
-    
-    setTimeRemaining(radiationTime);
-    
-    const timer = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          finishExposure();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [isExposing, radiationTime]);
-
-  const initCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-    
-    particlesRef.current = [];
-    cancelAnimationFrame(animationRef.current);
-    
-    const animate = () => {
-      drawRadiationEffect();
-      animationRef.current = requestAnimationFrame(animate);
-    };
-    
-    animationRef.current = requestAnimationFrame(animate);
-  };
-
-  const drawRadiationEffect = () => {
+  }, [isRadiating, selectedRadiation, radiationDose, cumDose, activeTab, showEffects]);
+  
+  // Draw the visualization
+  const drawVisualization = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Set canvas dimensions
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    
+    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    if (isExposing) {
-      const effectiveIntensity = Math.max(0, radiationIntensity - shieldingLevel * 0.5);
-      const particlesToCreate = Math.round(effectiveIntensity / 10);
-      
-      for (let i = 0; i < particlesToCreate; i++) {
-        if (Math.random() < 0.3) {
-          createRadiationParticle();
-        }
-      }
+    // Draw based on selected material
+    switch (activeTab as MaterialType) {
+      case 'dna':
+        drawDNA(ctx, canvas.width, canvas.height);
+        break;
+      case 'metal':
+        drawMetal(ctx, canvas.width, canvas.height);
+        break;
+      case 'plastic':
+        drawPlastic(ctx, canvas.width, canvas.height);
+        break;
+      case 'crystal':
+        drawCrystal(ctx, canvas.width, canvas.height);
+        break;
     }
     
-    const particles = particlesRef.current;
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
+    // Draw radiation particles if radiating
+    if (isRadiating) {
+      drawRadiationParticles(ctx, canvas.width, canvas.height);
+    }
+  };
+  
+  // Start radiation
+  const startRadiation = () => {
+    setIsRadiating(true);
+  };
+  
+  // Stop radiation
+  const stopRadiation = () => {
+    setIsRadiating(false);
+  };
+  
+  // Reset experiment
+  const resetExperiment = () => {
+    setIsRadiating(false);
+    setCumDose(0);
+    setDamageLevel(0);
+    setShowEffects(false);
+    
+    // Redraw visualization
+    drawVisualization();
+  };
+  
+  // Draw DNA visualization with 3D helix effect
+  const drawDNA = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    // Draw DNA helix
+    const helixWidth = Math.min(width * 0.3, 150);
+    const helixHeight = height * 0.7;
+    const startY = (height - helixHeight) / 2;
+    
+    // Draw the backbone
+    const numSteps = 20;
+    const stepHeight = helixHeight / numSteps;
+    
+    for (let i = 0; i < numSteps; i++) {
+      const y = startY + i * stepHeight;
+      const phase = i / 2;
       
-      p.x += p.vx;
-      p.y += p.vy;
-      
-      p.life--;
-      
-      if (p.life <= 0) {
-        particles.splice(i, 1);
-        continue;
-      }
-      
-      const opacity = p.life / p.maxLife;
+      // Left backbone
+      const leftX1 = centerX - helixWidth / 2 * Math.cos(phase);
+      const leftX2 = centerX - helixWidth / 2 * Math.cos(phase + 0.5);
       
       ctx.beginPath();
+      ctx.moveTo(leftX1, y);
+      ctx.lineTo(leftX2, y + stepHeight);
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 4;
+      ctx.stroke();
       
-      if (selectedRadiation === 'alpha') {
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 100, 100, ${opacity})`;
-      } else if (selectedRadiation === 'beta') {
-        ctx.arc(p.x, p.y, p.size * 0.6, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(100, 100, 255, ${opacity})`;
-      } else if (selectedRadiation === 'gamma') {
-        const startX = p.x - p.vx * 5;
-        const startY = p.y - p.vy * 5;
-        ctx.moveTo(startX, startY);
-        
-        for (let j = 0; j < 3; j++) {
-          const t = j / 2;
-          const midX = startX + p.vx * 5 * t + (j % 2 === 0 ? 3 : -3);
-          const midY = startY + p.vy * 5 * t;
-          ctx.lineTo(midX, midY);
-        }
-        
-        ctx.lineTo(p.x, p.y);
-        ctx.strokeStyle = `rgba(100, 255, 100, ${opacity})`;
-        ctx.lineWidth = p.size * 0.5;
-        ctx.stroke();
-        ctx.fillStyle = 'transparent';
-      } else if (selectedRadiation === 'neutron') {
-        ctx.arc(p.x, p.y, p.size * 1.2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 100, ${opacity})`;
-      }
-      
-      ctx.fill();
-      
-      // Prüfen, ob ein Teilchen mit der DNA kollidiert
-      if (selectedMaterial === 'dna' && isExposing) {
-        checkParticleCollisionWithDNA(p);
-      }
-    }
-    
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    
-    if (selectedMaterial === 'dna') {
-      drawDNA(ctx, centerX, centerY);
-    } else if (selectedMaterial === 'metal') {
-      drawMetal(ctx, centerX, centerY);
-    } else if (selectedMaterial === 'plastic') {
-      drawPlastic(ctx, centerX, centerY);
-    } else if (selectedMaterial === 'crystal') {
-      drawCrystal(ctx, centerX, centerY);
-    }
-  };
-
-  const checkParticleCollisionWithDNA = (particle: {x: number, y: number, life: number, vx: number, vy: number}) => {
-    if (dnaRungPositions.length === 0) return;
-    
-    // Prüfe Kollision mit DNA-Sprossen
-    for (let i = 0; i < dnaRungPositions.length; i++) {
-      const rung = dnaRungPositions[i];
-      const distanceToline = distancePointToLineSegment(
-        particle.x, particle.y,
-        rung.x1, rung.y1,
-        rung.x2, rung.y2
-      );
-      
-      if (distanceToline < 10) { // Kollisionsradius
-        // Nur manchmal Schaden anrichten, basierend auf Strahlungstyp
-        if (Math.random() < 0.4) {
-          const strandIndex = Math.floor(Math.random() * dnaStrands.length);
-          const strand = dnaStrands[strandIndex];
-          
-          if (!strand.damaged[i]) {
-            const newStrands = [...dnaStrands];
-            newStrands[strandIndex].damaged[i] = true;
-            
-            const midX = (rung.x1 + rung.x2) / 2;
-            const midY = (rung.y1 + rung.y2) / 2;
-            
-            // Füge einen Effekt hinzu, um die Beschädigung zu visualisieren
-            newStrands[strandIndex].damageEffects.push({
-              x: midX,
-              y: midY,
-              type: 'minor',
-              active: true
-            });
-            
-            // Geringe Chance auf Mutation
-            if (Math.random() < 0.2) {
-              newStrands[strandIndex].mutated[i] = true;
-              newStrands[strandIndex].damageEffects[newStrands[strandIndex].damageEffects.length - 1].type = 'mutation';
-            }
-            
-            setDnaStrands(newStrands);
-            
-            // Entferne das Teilchen
-            particle.x = -100;
-            particle.y = -100;
-            particle.life = 0;
-            break;
-          }
-        }
-      }
-    }
-  };
-
-  // Hilfsfunktion zur Berechnung des Abstands von einem Punkt zu einer Linie
-  const distancePointToLineSegment = (px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
-    const A = px - x1;
-    const B = py - y1;
-    const C = x2 - x1;
-    const D = y2 - y1;
-    
-    const dot = A * C + B * D;
-    const len_sq = C * C + D * D;
-    const param = len_sq !== 0 ? dot / len_sq : -1;
-    
-    let xx, yy;
-    
-    if (param < 0) {
-      xx = x1;
-      yy = y1;
-    } else if (param > 1) {
-      xx = x2;
-      yy = y2;
-    } else {
-      xx = x1 + param * C;
-      yy = y1 + param * D;
-    }
-    
-    const dx = px - xx;
-    const dy = py - yy;
-    
-    return Math.sqrt(dx * dx + dy * dy);
-  };
-
-  const createRadiationParticle = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const side = Math.floor(Math.random() * 4);
-    let x, y;
-    
-    switch (side) {
-      case 0:
-        x = Math.random() * canvas.width;
-        y = -5;
-        break;
-      case 1:
-        x = canvas.width + 5;
-        y = Math.random() * canvas.height;
-        break;
-      case 2:
-        x = Math.random() * canvas.width;
-        y = canvas.height + 5;
-        break;
-      case 3:
-        x = -5;
-        y = Math.random() * canvas.height;
-        break;
-      default:
-        x = 0;
-        y = 0;
-    }
-    
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    
-    const dx = centerX - x;
-    const dy = centerY - y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    let speedFactor = 1;
-    let sizeFactor = 1;
-    let lifeFactor = 1;
-    
-    switch (selectedRadiation) {
-      case 'alpha':
-        speedFactor = 0.6;
-        sizeFactor = 1.5;
-        lifeFactor = 0.7;
-        break;
-      case 'beta':
-        speedFactor = 1.3;
-        sizeFactor = 0.7;
-        lifeFactor = 0.9;
-        break;
-      case 'gamma':
-        speedFactor = 2.0;
-        sizeFactor = 0.5;
-        lifeFactor = 1.3;
-        break;
-      case 'neutron':
-        speedFactor = 1.0;
-        sizeFactor = 1.0;
-        lifeFactor = 1.0;
-        break;
-    }
-    
-    const randomAngle = (Math.random() - 0.5) * 0.5;
-    const vx = (dx / dist) * speedFactor * 2;
-    const vy = (dy / dist) * speedFactor * 2;
-    
-    const cosTerm = Math.cos(randomAngle);
-    const sinTerm = Math.sin(randomAngle);
-    const newVx = vx * cosTerm - vy * sinTerm;
-    const newVy = vx * sinTerm + vy * cosTerm;
-    
-    const maxLife = Math.round(dist * lifeFactor);
-    
-    particlesRef.current.push({
-      x,
-      y,
-      vx: newVx,
-      vy: newVy,
-      size: 2 * sizeFactor,
-      life: maxLife,
-      maxLife
-    });
-  };
-
-  const drawDNA = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number) => {
-    const width = 100;
-    const height = 150;
-    
-    // Berechne DNA-Helixdaten für Kollisionserkennung
-    const rungPositions: Array<{x1: number, y1: number, x2: number, y2: number}> = [];
-    
-    ctx.beginPath();
-    ctx.moveTo(centerX - width/2, centerY - height/2);
-    ctx.bezierCurveTo(
-      centerX + width/2, centerY - height/2 * 0.7,
-      centerX - width/2, centerY,
-      centerX + width/2, centerY + height/2 * 0.3
-    );
-    ctx.bezierCurveTo(
-      centerX - width/2, centerY + height/2 * 0.7,
-      centerX + width/2, centerY + height/2,
-      centerX - width/2, centerY + height/2
-    );
-    
-    ctx.strokeStyle = isExposing ? 'rgba(0, 100, 200, 0.5)' : 'rgba(0, 100, 200, 0.8)';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo(centerX + width/2, centerY - height/2);
-    ctx.bezierCurveTo(
-      centerX - width/2, centerY - height/2 * 0.7,
-      centerX + width/2, centerY,
-      centerX - width/2, centerY + height/2 * 0.3
-    );
-    ctx.bezierCurveTo(
-      centerX + width/2, centerY + height/2 * 0.7,
-      centerX - width/2, centerY + height/2,
-      centerX + width/2, centerY + height/2
-    );
-    
-    ctx.strokeStyle = isExposing ? 'rgba(0, 100, 200, 0.5)' : 'rgba(0, 100, 200, 0.8)';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    
-    const numRungs = 10;
-    for (let i = 0; i < numRungs; i++) {
-      const t = i / (numRungs - 1);
-      const y = centerY - height/2 + height * t;
-      
-      const t1 = Math.sin(t * Math.PI * 2) * 0.5 + 0.5;
-      const x1 = centerX - width/2 * t1;
-      const x2 = centerX + width/2 * (1 - t1);
-      
-      // Speichere Sprossenposition für Kollisionserkennung
-      rungPositions.push({x1, y1: y, x2, y2: y});
+      // Right backbone
+      const rightX1 = centerX + helixWidth / 2 * Math.cos(phase);
+      const rightX2 = centerX + helixWidth / 2 * Math.cos(phase + 0.5);
       
       ctx.beginPath();
-      ctx.moveTo(x1, y);
-      ctx.lineTo(x2, y);
+      ctx.moveTo(rightX1, y);
+      ctx.lineTo(rightX2, y + stepHeight);
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 4;
+      ctx.stroke();
       
-      const isDamaged = dnaStrands.some(strand => 
-        strand.damaged.length > i && strand.damaged[i]
-      );
-      
-      const isMutated = dnaStrands.some(strand => 
-        strand.mutated.length > i && strand.mutated[i]
-      );
-      
-      if (isMutated) {
-        // Für mutierte DNA-Elemente einen pulsierenden, lila Effekt zeigen
-        ctx.strokeStyle = 'rgba(255, 50, 255, 0.9)';
-        
-        // Zusätzliche Visualisierung für Mutationen
-        ctx.shadowColor = 'rgba(255, 50, 255, 0.8)';
-        ctx.shadowBlur = 8;
-      } else if (isDamaged) {
-        // Für beschädigte DNA-Elemente einen roten Effekt zeigen
-        ctx.strokeStyle = 'rgba(255, 50, 50, 0.9)';
-        
-        // Zusätzliche Visualisierung für Beschädigungen
-        ctx.shadowColor = 'rgba(255, 50, 50, 0.8)';
-        ctx.shadowBlur = 5;
-      } else {
-        ctx.strokeStyle = isExposing ? 'rgba(50, 200, 50, 0.5)' : 'rgba(50, 200, 50, 0.8)';
-        ctx.shadowBlur = 0;
-      }
-      
+      // Base pairs
+      ctx.beginPath();
+      ctx.moveTo(leftX1, y);
+      ctx.lineTo(rightX1, y);
+      ctx.strokeStyle = damageLevel > 30 && i % 3 === 0 ? '#ef4444' : '#10b981';
       ctx.lineWidth = 2;
       ctx.stroke();
-      ctx.shadowBlur = 0; // Setze Shadow-Effekt zurück
       
-      // Zeichne zusätzliche visuelle Effekte für Schäden/Mutationen
-      if (isDamaged || isMutated) {
-        const midX = (x1 + x2) / 2;
-        const midY = y;
+      // Add nucleotide bases (circles)
+      const baseColors = ['#f59e0b', '#ef4444', '#10b981', '#8b5cf6'];
+      
+      // Left base
+      ctx.beginPath();
+      ctx.arc(leftX1, y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = baseColors[i % 4];
+      ctx.fill();
+      
+      // Right base
+      ctx.beginPath();
+      ctx.arc(rightX1, y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = baseColors[(i + 2) % 4];
+      ctx.fill();
+    }
+    
+    // Draw damage effects
+    if (showEffects) {
+      // Strand breaks
+      const breakCount = Math.floor(damageLevel / 20);
+      for (let i = 0; i < breakCount; i++) {
+        const breakYPos = startY + (Math.random() * 0.8 + 0.1) * helixHeight;
+        const side = Math.random() > 0.5 ? 1 : -1;
+        const breakX = centerX + side * helixWidth / 2 * Math.cos(breakYPos / stepHeight);
+        
+        // Break visualization
+        ctx.beginPath();
+        ctx.arc(breakX, breakYPos, 10, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.5)';
+        ctx.fill();
         
         ctx.beginPath();
-        ctx.arc(midX, midY, 3, 0, Math.PI * 2);
-        ctx.fillStyle = isMutated ? 'rgba(255, 50, 255, 0.9)' : 'rgba(255, 50, 50, 0.9)';
+        ctx.moveTo(breakX - 5, breakYPos - 5);
+        ctx.lineTo(breakX + 5, breakYPos + 5);
+        ctx.moveTo(breakX + 5, breakYPos - 5);
+        ctx.lineTo(breakX - 5, breakYPos + 5);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+  };
+  
+  // Draw metal visualization
+  const drawMetal = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    // Draw metal lattice
+    const gridSize = 30;
+    const numRows = Math.floor(height * 0.7 / gridSize);
+    const numCols = Math.floor(width * 0.7 / gridSize);
+    const startX = centerX - (numCols * gridSize) / 2;
+    const startY = centerY - (numRows * gridSize) / 2;
+    
+    // Draw lattice points
+    for (let row = 0; row < numRows; row++) {
+      for (let col = 0; col < numCols; col++) {
+        const x = startX + col * gridSize;
+        const y = startY + row * gridSize;
+        
+        // Lattice point
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#6b7280';
         ctx.fill();
+        
+        // Distorted lattice for damage
+        if (showEffects && Math.random() < damageLevel / 200) {
+          ctx.beginPath();
+          ctx.arc(
+            x + (Math.random() - 0.5) * 10,
+            y + (Math.random() - 0.5) * 10,
+            3,
+            0,
+            Math.PI * 2
+          );
+          ctx.fillStyle = '#ef4444';
+          ctx.fill();
+        }
+        
+        // Connect lattice points
+        if (col < numCols - 1) {
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + gridSize, y);
+          ctx.strokeStyle = '#9ca3af';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+        
+        if (row < numRows - 1) {
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y + gridSize);
+          ctx.strokeStyle = '#9ca3af';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
       }
     }
     
-    // Speichere Rung-Positionen für Kollisionserkennung
-    setDnaRungPositions(rungPositions);
-    
-    // Zeichne aktive Schadenseffekte
-    dnaStrands.forEach(strand => {
-      strand.damageEffects.forEach((effect, index) => {
-        if (effect.active) {
-          // Animierte Schadensvisualisierung
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, 5, 0, Math.PI * 2);
-          
-          if (effect.type === 'mutation') {
-            ctx.fillStyle = 'rgba(255, 50, 255, 0.7)';
-          } else {
-            ctx.fillStyle = 'rgba(255, 50, 50, 0.7)';
-          }
-          
-          ctx.fill();
-        }
-      });
-    });
-  };
-
-  const drawMetal = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number) => {
-    const width = 120;
-    const height = 80;
-    
-    ctx.fillStyle = 'rgba(180, 180, 180, 0.9)';
-    ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
-    
-    const gradient = ctx.createLinearGradient(
-      centerX - width/2, centerY - height/2,
-      centerX + width/2, centerY + height/2
-    );
-    gradient.addColorStop(0, 'rgba(220, 220, 220, 0.8)');
-    gradient.addColorStop(0.5, 'rgba(150, 150, 150, 0.3)');
-    gradient.addColorStop(1, 'rgba(180, 180, 180, 0.8)');
-    
-    ctx.fillStyle = gradient;
-    ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
-    
-    if (electronEmission > 0) {
-      const numElectrons = Math.floor(electronEmission / 10);
+    // Draw electrons if showing effects for metal
+    if (showEffects) {
+      const electronCount = Math.floor(damageLevel / 5);
       
-      for (let i = 0; i < numElectrons; i++) {
+      for (let i = 0; i < electronCount; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const distance = 20 + Math.random() * 30;
-        
-        const ex = centerX + Math.cos(angle) * distance;
-        const ey = centerY + Math.sin(angle) * distance;
+        const distance = Math.random() * width * 0.3;
+        const x = centerX + Math.cos(angle) * distance;
+        const y = centerY + Math.sin(angle) * distance;
         
         ctx.beginPath();
-        ctx.arc(ex, ey, 2, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0, 100, 255, 0.8)';
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#3b82f6';
         ctx.fill();
         
+        // Add electron trail
         ctx.beginPath();
-        ctx.moveTo(centerX + Math.cos(angle) * 10, centerY + Math.sin(angle) * 10);
-        ctx.lineTo(ex, ey);
-        ctx.strokeStyle = 'rgba(100, 150, 255, 0.4)';
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x - Math.cos(angle) * 10,
+          y - Math.sin(angle) * 10
+        );
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
         ctx.lineWidth = 1;
         ctx.stroke();
       }
     }
   };
-
-  const drawPlastic = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number) => {
-    const width = 100;
-    const height = 80;
+  
+  // Draw plastic visualization
+  const drawPlastic = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
     
-    ctx.fillStyle = 'rgba(230, 230, 250, 0.9)';
-    ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
+    // Draw polymer chains
+    const chainCount = 7;
+    const chainSpacing = height * 0.6 / chainCount;
+    const chainLength = width * 0.6;
+    const startX = centerX - chainLength / 2;
+    const startY = centerY - (chainCount * chainSpacing) / 2 + chainSpacing / 2;
     
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
-    
-    if (materialDegradation > 0) {
-      const numCracks = Math.floor(materialDegradation / 10);
+    for (let i = 0; i < chainCount; i++) {
+      const y = startY + i * chainSpacing;
       
-      ctx.strokeStyle = 'rgba(100, 50, 50, 0.5)';
-      ctx.lineWidth = 1;
+      // Draw polymer backbone
+      const segments = 20;
+      const segmentLength = chainLength / segments;
       
-      for (let i = 0; i < numCracks; i++) {
-        const startX = centerX - width/2 + Math.random() * width;
-        const startY = centerY - height/2 + Math.random() * height;
+      for (let j = 0; j < segments; j++) {
+        const x = startX + j * segmentLength;
         
+        // Backbone
         ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        
-        const crackLength = 5 + Math.random() * 15;
-        let currentX = startX;
-        let currentY = startY;
-        
-        for (let j = 0; j < crackLength; j++) {
-          const angle = Math.random() * Math.PI * 2;
-          const segLength = 2 + Math.random() * 3;
-          
-          currentX += Math.cos(angle) * segLength;
-          currentY += Math.sin(angle) * segLength;
-          
-          currentX = Math.max(centerX - width/2, Math.min(centerX + width/2, currentX));
-          currentY = Math.max(centerY - height/2, Math.min(centerY + height/2, currentY));
-          
-          ctx.lineTo(currentX, currentY);
+        if (showEffects && damageLevel > 40 && Math.random() < damageLevel / 300) {
+          // Break in chain to show damage
+          if (j > 0 && j < segments - 1) {
+            // Draw break
+            ctx.moveTo(x - segmentLength, y);
+            ctx.lineTo(x - segmentLength / 3, y);
+            ctx.moveTo(x + segmentLength / 3, y);
+            ctx.lineTo(x + segmentLength, y);
+          } else {
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + segmentLength, y);
+          }
+        } else {
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + segmentLength, y);
         }
-        
+        ctx.strokeStyle = '#9ca3af';
+        ctx.lineWidth = 2;
         ctx.stroke();
-      }
-      
-      if (materialDegradation > 50) {
-        ctx.fillStyle = `rgba(200, 180, 0, ${materialDegradation / 200})`;
-        ctx.fillRect(centerX - width/2, centerY - height/2, width, height);
-      }
-    }
-  };
-
-  const drawCrystal = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number) => {
-    const size = 60;
-    
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const angle = i * Math.PI / 3;
-      const x = centerX + Math.cos(angle) * size;
-      const y = centerY + Math.sin(angle) * size;
-      
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-    ctx.closePath();
-    
-    ctx.fillStyle = 'rgba(200, 230, 255, 0.5)';
-    ctx.fill();
-    
-    ctx.strokeStyle = 'rgba(100, 150, 200, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    
-    ctx.beginPath();
-    for (let i = 0; i < 3; i++) {
-      const angle = i * Math.PI / 3;
-      const x1 = centerX + Math.cos(angle) * size;
-      const y1 = centerY + Math.sin(angle) * size;
-      const x2 = centerX + Math.cos(angle + Math.PI) * size;
-      const y2 = centerY + Math.sin(angle + Math.PI) * size;
-      
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-    }
-    ctx.strokeStyle = 'rgba(150, 200, 255, 0.4)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    
-    if (crystalLuminescence > 0) {
-      const glow = ctx.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, size * 1.2
-      );
-      
-      const intensity = crystalLuminescence / 100;
-      const color = selectedRadiation === 'alpha' ? [255, 150, 150] :
-                    selectedRadiation === 'beta' ? [150, 150, 255] :
-                    selectedRadiation === 'gamma' ? [150, 255, 150] :
-                    [255, 255, 150];
-      
-      glow.addColorStop(0, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${intensity * 0.7})`);
-      glow.addColorStop(1, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`);
-      
-      ctx.fillStyle = glow;
-      ctx.fillRect(centerX - size * 1.5, centerY - size * 1.5, size * 3, size * 3);
-      
-      const numParticles = Math.floor(intensity * 10);
-      
-      for (let i = 0; i < numParticles; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = size * 0.2 + Math.random() * size * 0.8;
         
-        const px = centerX + Math.cos(angle) * distance;
-        const py = centerY + Math.sin(angle) * distance;
+        // Add side groups every other segment
+        if (j % 2 === 0) {
+          const sideLength = chainSpacing * 0.4;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y - sideLength);
+          ctx.strokeStyle = '#6b7280';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          
+          // Side group "molecule"
+          ctx.beginPath();
+          ctx.arc(x, y - sideLength, 3, 0, Math.PI * 2);
+          ctx.fillStyle = '#60a5fa';
+          ctx.fill();
+        }
+      }
+    }
+    
+    // Draw damage effects for plastic
+    if (showEffects) {
+      // Discoloration and cracking
+      const crackCount = Math.floor(damageLevel / 15);
+      
+      for (let i = 0; i < crackCount; i++) {
+        const x = startX + Math.random() * chainLength;
+        const y = startY + Math.random() * (chainCount * chainSpacing);
+        
+        // Draw crack
+        const crackLength = 10 + Math.random() * 20;
+        const angle = Math.random() * Math.PI;
         
         ctx.beginPath();
-        ctx.arc(px, py, 1 + Math.random() * 2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${0.5 + Math.random() * 0.5})`;
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.cos(angle) * crackLength,
+          y + Math.sin(angle) * crackLength
+        );
+        ctx.strokeStyle = '#7c3aed';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Discoloration
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(244, 114, 182, 0.2)';
         ctx.fill();
       }
     }
   };
-
-  const handleStartExposure = () => {
-    if (isExposing) return;
+  
+  // Draw crystal visualization
+  const drawCrystal = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
     
-    setIsExposing(true);
+    // Draw crystal lattice
+    const crystalSize = Math.min(width, height) * 0.4;
     
-    toast({
-      title: "Bestrahlung gestartet",
-      description: `${getRadiationName(selectedRadiation)} Strahlung auf ${getMaterialName(selectedMaterial)}, ${radiationTime} Sekunden.`,
-    });
+    // Base crystal shape
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - crystalSize / 2);
+    ctx.lineTo(centerX + crystalSize / 2, centerY);
+    ctx.lineTo(centerX, centerY + crystalSize / 2);
+    ctx.lineTo(centerX - crystalSize / 2, centerY);
+    ctx.closePath();
     
-    if (selectedMaterial === 'dna') {
-      createInitialDNA();
-    } else if (selectedMaterial === 'metal') {
-      setElectronEmission(0);
-    } else if (selectedMaterial === 'plastic') {
-      setMaterialDegradation(0);
-    } else if (selectedMaterial === 'crystal') {
-      setCrystalLuminescence(0);
-    }
-  };
-
-  const createInitialDNA = () => {
-    const newStrands: DnaStrand[] = [];
-    
-    for (let i = 0; i < 3; i++) {
-      const sequence = generateDNASequence(10);
-      newStrands.push({
-        id: i,
-        sequence,
-        damaged: new Array(10).fill(false),
-        mutated: new Array(10).fill(false),
-        damageEffects: []
-      });
+    // Crystal fill based on damage level
+    let crystalFill;
+    if (showEffects) {
+      // Create a gradient that gets more intense with damage
+      const intensity = Math.min(0.8, damageLevel / 100);
+      crystalFill = ctx.createRadialGradient(
+        centerX, centerY, 10,
+        centerX, centerY, crystalSize / 2
+      );
+      crystalFill.addColorStop(0, `rgba(167, 139, 250, ${intensity})`);
+      crystalFill.addColorStop(1, 'rgba(167, 139, 250, 0.1)');
+    } else {
+      crystalFill = 'rgba(203, 213, 225, 0.3)';
     }
     
-    setDnaStrands(newStrands);
-  };
-
-  const generateDNASequence = (length: number): string => {
-    const bases = ['A', 'T', 'G', 'C'];
-    let sequence = '';
+    ctx.fillStyle = crystalFill;
+    ctx.fill();
     
-    for (let i = 0; i < length; i++) {
-      sequence += bases[Math.floor(Math.random() * bases.length)];
-    }
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 2;
+    ctx.stroke();
     
-    return sequence;
-  };
-
-  const finishExposure = () => {
-    setIsExposing(false);
-    applyRadiationEffects();
+    // Draw inner crystal structure
+    const innerSize = crystalSize * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - innerSize / 2);
+    ctx.lineTo(centerX + innerSize / 2, centerY);
+    ctx.lineTo(centerX, centerY + innerSize / 2);
+    ctx.lineTo(centerX - innerSize / 2, centerY);
+    ctx.closePath();
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1;
+    ctx.stroke();
     
-    toast({
-      title: "Bestrahlung abgeschlossen",
-      description: "Die Auswirkungen der Strahlung sind jetzt sichtbar.",
-    });
-  };
-
-  const applyRadiationEffects = () => {
-    const effectiveIntensity = Math.max(0, radiationIntensity - shieldingLevel * 0.5);
+    // Draw crystalline planes
+    ctx.beginPath();
+    ctx.moveTo(centerX - innerSize / 2, centerY);
+    ctx.lineTo(centerX + innerSize / 2, centerY);
+    ctx.moveTo(centerX, centerY - innerSize / 2);
+    ctx.lineTo(centerX, centerY + innerSize / 2);
+    ctx.strokeStyle = 'rgba(203, 213, 225, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
     
-    if (selectedMaterial === 'dna') {
-      applyDNADamage(effectiveIntensity);
-    } else if (selectedMaterial === 'metal') {
-      applyPhotoelectricEffect(effectiveIntensity);
-    } else if (selectedMaterial === 'plastic') {
-      applyMaterialDegradation(effectiveIntensity);
-    } else if (selectedMaterial === 'crystal') {
-      applyCrystalLuminescence(effectiveIntensity);
-    }
-  };
-
-  const applyDNADamage = (intensity: number) => {
-    const newStrands = [...dnaStrands];
-    
-    newStrands.forEach(strand => {
-      const damageChance = intensity / 100;
-      
-      let baseDamageMultiplier = 1;
-      let baseMutationMultiplier = 1;
-      
-      switch (selectedRadiation) {
-        case 'alpha':
-          baseDamageMultiplier = 2.0;
-          baseMutationMultiplier = 0.5;
-          break;
-        case 'beta':
-          baseDamageMultiplier = 1.0;
-          baseMutationMultiplier = 1.0;
-          break;
-        case 'gamma':
-          baseDamageMultiplier = 1.5;
-          baseMutationMultiplier = 1.5;
-          break;
-        case 'neutron':
-          baseDamageMultiplier = 3.0;
-          baseMutationMultiplier = 2.0;
-          break;
-      }
-      
-      for (let i = 0; i < strand.sequence.length; i++) {
-        if (Math.random() < damageChance * baseDamageMultiplier / 10) {
-          strand.damaged[i] = true;
-          
-          // Wenn Rungpositionen bereits berechnet wurden
-          if (dnaRungPositions.length > i) {
-            const rungPos = dnaRungPositions[i];
-            const midX = (rungPos.x1 + rungPos.x2) / 2;
-            const midY = (rungPos.y1 + rungPos.y2) / 2;
-            
-            // Visuellen Effekt für die Beschädigung hinzufügen
-            strand.damageEffects.push({
-              x: midX,
-              y: midY,
-              type: 'minor',
-              active: true
-            });
-          }
-        }
+    // Draw glowing if showing effects
+    if (showEffects) {
+      // Add glowing particles
+      const particleCount = Math.floor(damageLevel / 5);
+      for (let i = 0; i < particleCount; i++) {
+        // Random position within crystal
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * innerSize / 2;
+        const x = centerX + Math.cos(angle) * distance;
+        const y = centerY + Math.sin(angle) * distance;
         
-        if (strand.damaged[i] && Math.random() < damageChance * baseMutationMultiplier / 20) {
-          strand.mutated[i] = true;
-          
-          // Falls ein Schadenseffekt für diesen Index existiert, ändere ihn zu einer Mutation
-          const effectIndex = strand.damageEffects.findIndex(
-            effect => dnaRungPositions.length > i && 
-            Math.abs(effect.x - (dnaRungPositions[i].x1 + dnaRungPositions[i].x2) / 2) < 10 &&
-            Math.abs(effect.y - dnaRungPositions[i].y1) < 10
-          );
-          
-          if (effectIndex >= 0) {
-            strand.damageEffects[effectIndex].type = 'mutation';
-          } else if (dnaRungPositions.length > i) {
-            // Falls kein Effekt existiert, füge einen neuen hinzu
-            const rungPos = dnaRungPositions[i];
-            const midX = (rungPos.x1 + rungPos.x2) / 2;
-            const midY = (rungPos.y1 + rungPos.y2) / 2;
-            
-            strand.damageEffects.push({
-              x: midX,
-              y: midY,
-              type: 'mutation',
-              active: true
-            });
-          }
-        }
+        // Glow effect
+        const glow = ctx.createRadialGradient(
+          x, y, 0,
+          x, y, 5 + Math.random() * 5
+        );
+        glow.addColorStop(0, 'rgba(167, 139, 250, 0.8)');
+        glow.addColorStop(1, 'rgba(167, 139, 250, 0)');
+        
+        ctx.beginPath();
+        ctx.arc(x, y, 5 + Math.random() * 5, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.fill();
       }
-    });
-    
-    setDnaStrands(newStrands);
-  };
-
-  const applyPhotoelectricEffect = (intensity: number) => {
-    let effectMultiplier = 0;
-    
-    switch (selectedRadiation) {
-      case 'alpha':
-        effectMultiplier = 0.2;
-        break;
-      case 'beta':
-        effectMultiplier = 0.8;
-        break;
-      case 'gamma':
-        effectMultiplier = 1.5;
-        break;
-      case 'neutron':
-        effectMultiplier = 0.1;
-        break;
-    }
-    
-    const newEmission = Math.min(100, intensity * effectMultiplier);
-    setElectronEmission(newEmission);
-  };
-
-  const applyMaterialDegradation = (intensity: number) => {
-    let degradationMultiplier = 1;
-    
-    switch (selectedRadiation) {
-      case 'alpha':
-        degradationMultiplier = 1.0;
-        break;
-      case 'beta':
-        degradationMultiplier = 0.7;
-        break;
-      case 'gamma':
-        degradationMultiplier = 2.0;
-        break;
-      case 'neutron':
-        degradationMultiplier = 3.0;
-        break;
-    }
-    
-    const newDegradation = Math.min(100, intensity * degradationMultiplier);
-    setMaterialDegradation(newDegradation);
-  };
-
-  const applyCrystalLuminescence = (intensity: number) => {
-    let luminescenceMultiplier = 1;
-    
-    switch (selectedRadiation) {
-      case 'alpha':
-        luminescenceMultiplier = 0.8;
-        break;
-      case 'beta':
-        luminescenceMultiplier = 1.2;
-        break;
-      case 'gamma':
-        luminescenceMultiplier = 1.5;
-        break;
-      case 'neutron':
-        luminescenceMultiplier = 1.0;
-        break;
-    }
-    
-    const newLuminescence = Math.min(100, intensity * luminescenceMultiplier);
-    setCrystalLuminescence(newLuminescence);
-  };
-
-  const resetExperiment = () => {
-    setIsExposing(false);
-    setTimeRemaining(0);
-    
-    if (selectedMaterial === 'dna') {
-      createInitialDNA();
-    } else if (selectedMaterial === 'metal') {
-      setElectronEmission(0);
-    } else if (selectedMaterial === 'plastic') {
-      setMaterialDegradation(0);
-    } else if (selectedMaterial === 'crystal') {
-      setCrystalLuminescence(0);
-    }
-    
-    particlesRef.current = [];
-  };
-
-  const getRadiationName = (type: RadiationType): string => {
-    switch(type) {
-      case 'alpha': return 'Alpha';
-      case 'beta': return 'Beta';
-      case 'gamma': return 'Gamma';
-      case 'neutron': return 'Neutronen';
-      default: return '';
     }
   };
-
-  const getMaterialName = (type: MaterialType): string => {
-    switch(type) {
-      case 'dna': return 'DNA';
-      case 'metal': return 'Metall';
-      case 'plastic': return 'Kunststoff';
-      case 'crystal': return 'Kristall';
-      default: return '';
+  
+  // Draw radiation particles
+  const drawRadiationParticles = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const particleCount = Math.ceil(radiationDose / 10);
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const maxDistance = Math.min(width, height) * 0.4;
+    
+    for (let i = 0; i < particleCount; i++) {
+      // Generate random position outside target
+      const angle = Math.random() * Math.PI * 2;
+      const distance = maxDistance + 50 + Math.random() * 50;
+      const startX = centerX + Math.cos(angle) * distance;
+      const startY = centerY + Math.sin(angle) * distance;
+      
+      // Target position with some variance
+      const targetAngle = angle + (Math.random() - 0.5) * 0.5;
+      const targetDistance = Math.random() * maxDistance * 0.8;
+      const targetX = centerX + Math.cos(targetAngle) * targetDistance;
+      const targetY = centerY + Math.sin(targetAngle) * targetDistance;
+      
+      // Get particle properties
+      const properties = radiationProperties[selectedRadiation];
+      
+      // Draw particle path
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(targetX, targetY);
+      ctx.strokeStyle = `rgba(${hexToRgb(properties.color)}, 0.3)`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      // Draw particle
+      ctx.beginPath();
+      ctx.arc(
+        startX + (targetX - startX) * 0.7,
+        startY + (targetY - startY) * 0.7,
+        3,
+        0,
+        Math.PI * 2
+      );
+      ctx.fillStyle = properties.color;
+      ctx.fill();
+      
+      // Draw symbol at end point
+      ctx.font = "bold 10px Arial";
+      ctx.fillStyle = properties.color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(properties.symbol, targetX, targetY);
     }
   };
-
-  // Rendern Sie DNA-Schäden als eigene Komponenten außerhalb des Canvas
-  const renderDNADamageEffects = () => {
-    return dnaStrands.flatMap(strand => 
-      strand.damageEffects
-        .filter(effect => effect.active)
-        .map((effect, idx) => (
-          <Effect 
-            key={`damage-${strand.id}-${idx}`}
-            type="dna-damage"
-            x={effect.x}
-            y={effect.y}
-            damageLevel={effect.type}
-            onComplete={() => {
-              // Effekt nach der Animation entfernen
-              const updatedStrands = [...dnaStrands];
-              const effectIndex = updatedStrands[strand.id].damageEffects.findIndex(
-                (e, i) => i === idx
-              );
-              if (effectIndex >= 0) {
-                updatedStrands[strand.id].damageEffects[effectIndex].active = false;
-                setDnaStrands(updatedStrands);
-              }
-            }}
-          />
-        ))
-    );
+  
+  // Helper function to convert hex to rgb for opacity
+  const hexToRgb = (hex: string): string => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `${r}, ${g}, ${b}`;
   };
-
+  
   return (
-    <Card className={cn("p-6 bg-white", className)}>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Strahlungs-Labor</h2>
-          <Badge variant={isExposing ? "default" : "outline"}>
-            {isExposing ? "Bestrahlung läuft..." : "Bereit"}
-          </Badge>
-        </div>
+    <Card className={cn("p-6", className)}>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Strahlungslabor</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-4">
-            <Tabs defaultValue="radiation" className="w-full">
-              <TabsList className="grid grid-cols-2 mb-4">
-                <TabsTrigger value="radiation">Strahlung</TabsTrigger>
-                <TabsTrigger value="material">Material</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="radiation" className="space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    className={cn(
-                      "h-20 flex-col items-center justify-center space-y-2 text-left",
-                      selectedRadiation === 'alpha' ? "border-4 border-primary" : "border"
-                    )}
-                    variant="outline"
-                    onClick={() => !isExposing && setSelectedRadiation('alpha')}
-                    disabled={isExposing}
-                  >
-                    <div className="flex items-center">
-                      <Atom className="h-5 w-5 mr-2 text-red-500" />
-                      <span className="font-bold">Alpha</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Schwere Heliumkerne, geringe Reichweite</p>
-                  </Button>
-                  
-                  <Button 
-                    className={cn(
-                      "h-20 flex-col items-center justify-center space-y-2 text-left",
-                      selectedRadiation === 'beta' ? "border-4 border-primary" : "border"
-                    )}
-                    variant="outline"
-                    onClick={() => !isExposing && setSelectedRadiation('beta')}
-                    disabled={isExposing}
-                  >
-                    <div className="flex items-center">
-                      <Zap className="h-5 w-5 mr-2 text-blue-500" />
-                      <span className="font-bold">Beta</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Schnelle Elektronen, mittlere Reichweite</p>
-                  </Button>
-                  
-                  <Button 
-                    className={cn(
-                      "h-20 flex-col items-center justify-center space-y-2 text-left",
-                      selectedRadiation === 'gamma' ? "border-4 border-primary" : "border"
-                    )}
-                    variant="outline"
-                    onClick={() => !isExposing && setSelectedRadiation('gamma')}
-                    disabled={isExposing}
-                  >
-                    <div className="flex items-center">
-                      <Zap className="h-5 w-5 mr-2 text-green-500" />
-                      <span className="font-bold">Gamma</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Elektromagnetische Wellen, hohe Reichweite</p>
-                  </Button>
-                  
-                  <Button 
-                    className={cn(
-                      "h-20 flex-col items-center justify-center space-y-2 text-left",
-                      selectedRadiation === 'neutron' ? "border-4 border-primary" : "border"
-                    )}
-                    variant="outline"
-                    onClick={() => !isExposing && setSelectedRadiation('neutron')}
-                    disabled={isExposing}
-                  >
-                    <div className="flex items-center">
-                      <Atom className="h-5 w-5 mr-2 text-yellow-500" />
-                      <span className="font-bold">Neutronen</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Neutrale Teilchen, tief eindringend</p>
-                  </Button>
-                </div>
-                
-                <div className="space-y-3">
-                  <label className="text-sm font-medium">
-                    Intensität: {radiationIntensity}%
-                  </label>
-                  <Slider 
-                    value={[radiationIntensity]} 
-                    min={1} 
-                    max={100} 
-                    step={1} 
-                    onValueChange={values => !isExposing && setRadiationIntensity(values[0])} 
-                    disabled={isExposing}
-                  />
-                </div>
-                
-                <div className="space-y-3">
-                  <label className="text-sm font-medium">
-                    Bestrahlungszeit: {radiationTime} Sekunden
-                  </label>
-                  <Slider 
-                    value={[radiationTime]} 
-                    min={1} 
-                    max={10} 
-                    step={1} 
-                    onValueChange={values => !isExposing && setRadiationTime(values[0])} 
-                    disabled={isExposing}
-                  />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="material" className="space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    className={cn(
-                      "h-20 flex-col items-center justify-center space-y-2 text-left",
-                      selectedMaterial === 'dna' ? "border-4 border-primary" : "border"
-                    )}
-                    variant="outline"
-                    onClick={() => !isExposing && setSelectedMaterial('dna')}
-                    disabled={isExposing}
-                  >
-                    <div className="flex items-center">
-                      <Dna className="h-5 w-5 mr-2 text-blue-500" />
-                      <span className="font-bold">DNA</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Kann mutieren oder beschädigt werden</p>
-                  </Button>
-                  
-                  <Button 
-                    className={cn(
-                      "h-20 flex-col items-center justify-center space-y-2 text-left",
-                      selectedMaterial === 'metal' ? "border-4 border-primary" : "border"
-                    )}
-                    variant="outline"
-                    onClick={() => !isExposing && setSelectedMaterial('metal')}
-                    disabled={isExposing}
-                  >
-                    <div className="flex items-center">
-                      <Shield className="h-5 w-5 mr-2 text-gray-500" />
-                      <span className="font-bold">Metall</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Kann Elektronen freisetzen</p>
-                  </Button>
-                  
-                  <Button 
-                    className={cn(
-                      "h-20 flex-col items-center justify-center space-y-2 text-left",
-                      selectedMaterial === 'plastic' ? "border-4 border-primary" : "border"
-                    )}
-                    variant="outline"
-                    onClick={() => !isExposing && setSelectedMaterial('plastic')}
-                    disabled={isExposing}
-                  >
-                    <div className="flex items-center">
-                      <FlaskConical className="h-5 w-5 mr-2 text-purple-500" />
-                      <span className="font-bold">Kunststoff</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Kann durch Strahlung degradieren</p>
-                  </Button>
-                  
-                  <Button 
-                    className={cn(
-                      "h-20 flex-col items-center justify-center space-y-2 text-left",
-                      selectedMaterial === 'crystal' ? "border-4 border-primary" : "border"
-                    )}
-                    variant="outline"
-                    onClick={() => !isExposing && setSelectedMaterial('crystal')}
-                    disabled={isExposing}
-                  >
-                    <div className="flex items-center">
-                      <BellRing className="h-5 w-5 mr-2 text-cyan-500" />
-                      <span className="font-bold">Kristall</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Kann durch Strahlung leuchten</p>
-                  </Button>
-                </div>
-                
-                <div className="space-y-3">
-                  <label className="text-sm font-medium">
-                    Abschirmung: {shieldingLevel}%
-                  </label>
-                  <Slider 
-                    value={[shieldingLevel]} 
-                    min={0} 
-                    max={100} 
-                    step={5} 
-                    onValueChange={values => !isExposing && setShieldingLevel(values[0])} 
-                    disabled={isExposing}
-                  />
-                </div>
-              </TabsContent>
-            </Tabs>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="dna">DNA</TabsTrigger>
+            <TabsTrigger value="metal">Metall</TabsTrigger>
+            <TabsTrigger value="plastic">Kunststoff</TabsTrigger>
+            <TabsTrigger value="crystal">Kristall</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          <div className="aspect-square bg-gray-100 rounded-lg relative overflow-hidden">
+            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
             
-            <div className="pt-2 space-y-3">
-              {isExposing && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Verbleibende Zeit:</span>
-                    <span>{timeRemaining} Sekunden</span>
-                  </div>
-                  <Progress value={(timeRemaining / radiationTime) * 100} />
-                </div>
-              )}
-              
-              <Button 
-                className="w-full" 
-                onClick={isExposing ? undefined : handleStartExposure}
-                disabled={isExposing}
-              >
-                {isExposing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Bestrahlung läuft...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Bestrahlung starten
-                  </>
-                )}
-              </Button>
-              
-              {isExposing && (
-                <Button
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => {
-                    setIsExposing(false);
-                    resetExperiment();
-                  }}
-                >
-                  <Hand className="mr-2 h-4 w-4" />
-                  Abbrechen
-                </Button>
-              )}
-              
-              {!isExposing && (timeRemaining === 0) && (
-                <Button
-                  variant="outline" 
-                  className="w-full"
-                  onClick={resetExperiment}
-                >
-                  <Backpack className="mr-2 h-4 w-4" />
-                  Zurücksetzen
-                </Button>
-              )}
+            {isRadiating && (
+              <div className="absolute top-4 left-4 bg-red-100 border border-red-300 text-red-800 px-3 py-1 rounded-full text-sm animate-pulse">
+                <Activity className="inline-block mr-1 h-4 w-4" />
+                Strahlung aktiv
+              </div>
+            )}
+            
+            {showEffects && (
+              <div className="absolute bottom-4 right-4 bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1 rounded-full text-sm">
+                <Sparkles className="inline-block mr-1 h-4 w-4" />
+                Effekte sichtbar
+              </div>
+            )}
+            
+            <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded text-sm">
+              {activeTab === 'dna' ? 'DNA-Strang' : 
+               activeTab === 'metal' ? 'Metallgitter' : 
+               activeTab === 'plastic' ? 'Polymer-Ketten' : 'Kristallstruktur'}
             </div>
           </div>
           
-          <div className="relative">
-            <div className="aspect-square w-full bg-slate-50 rounded-lg overflow-hidden">
-              <canvas 
-                ref={canvasRef} 
-                className="w-full h-full"
-              />
-              
-              {/* DNA-Schadenseffekte über dem Canvas */}
-              {selectedMaterial === 'dna' && renderDNADamageEffects()}
-            </div>
+          <div className="flex space-x-2 mt-4">
+            <Button 
+              className={cn("flex-1", isRadiating ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600")}
+              onClick={isRadiating ? stopRadiation : startRadiation}
+            >
+              {isRadiating ? (
+                <>
+                  <CircleOff className="mr-2 h-4 w-4" />
+                  Bestrahlung stoppen
+                </>
+              ) : (
+                <>
+                  <Radiation className="mr-2 h-4 w-4" />
+                  Mit {radiationProperties[selectedRadiation].symbol} bestrahlen
+                </>
+              )}
+            </Button>
             
-            {!isExposing && selectedMaterial === 'dna' && dnaStrands.length > 0 && (
-              <div className="mt-2 p-2 bg-white rounded border text-xs">
-                <div className="font-semibold mb-1">DNA-Analyse:</div>
-                {dnaStrands.map(strand => {
-                  const damagedCount = strand.damaged.filter(Boolean).length;
-                  const mutatedCount = strand.mutated.filter(Boolean).length;
-                  return (
-                    <div key={strand.id} className="flex justify-between">
-                      <span>Strang {strand.id + 1}: {strand.sequence}</span>
-                      {(damagedCount > 0 || mutatedCount > 0) && (
-                        <span>
-                          {damagedCount > 0 && (
-                            <Badge variant="outline" className="ml-1 text-red-500 text-[10px] h-4 px-1">
-                              {damagedCount} beschädigt
-                            </Badge>
-                          )}
-                          {mutatedCount > 0 && (
-                            <Badge variant="outline" className="ml-1 text-purple-500 text-[10px] h-4 px-1">
-                              {mutatedCount} mutiert
-                            </Badge>
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {!isExposing && selectedMaterial === 'metal' && electronEmission > 0 && (
-              <div className="mt-2 p-2 bg-white rounded border text-xs">
-                <div className="font-semibold mb-1">Photoelektrischer Effekt:</div>
-                <div className="flex justify-between">
-                  <span>Elektronenemission:</span>
-                  <span>{electronEmission.toFixed(1)}%</span>
-                </div>
-                <Progress value={electronEmission} className="h-2 mt-1" />
-              </div>
-            )}
-            
-            {!isExposing && selectedMaterial === 'plastic' && materialDegradation > 0 && (
-              <div className="mt-2 p-2 bg-white rounded border text-xs">
-                <div className="font-semibold mb-1">Materialdegradation:</div>
-                <div className="flex justify-between">
-                  <span>Schädigungsgrad:</span>
-                  <span>{materialDegradation.toFixed(1)}%</span>
-                </div>
-                <Progress value={materialDegradation} className="h-2 mt-1" />
-              </div>
-            )}
-            
-            {!isExposing && selectedMaterial === 'crystal' && crystalLuminescence > 0 && (
-              <div className="mt-2 p-2 bg-white rounded border text-xs">
-                <div className="font-semibold mb-1">Lumineszenz:</div>
-                <div className="flex justify-between">
-                  <span>Leuchtintensität:</span>
-                  <span>{crystalLuminescence.toFixed(1)}%</span>
-                </div>
-                <Progress value={crystalLuminescence} className="h-2 mt-1" />
-              </div>
-            )}
+            <Button variant="outline" onClick={resetExperiment} disabled={isRadiating}>
+              Zurücksetzen
+            </Button>
           </div>
         </div>
         
-        <div className="text-sm text-gray-500 border-t pt-4">
-          <Microscope className="inline-block h-4 w-4 mr-1" />
-          <span className="align-middle">
-            Dieses Labor zeigt die Effekte verschiedener Strahlungsarten auf unterschiedliche Materialien.
-            Experimentiere mit den Einstellungen, um mehr zu lernen.
-          </span>
+        <div className="space-y-6">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="text-lg font-medium mb-4">Strahlungsparameter</h3>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">Strahlungsart</label>
+                <Select 
+                  value={selectedRadiation}
+                  onValueChange={(value) => setSelectedRadiation(value as RadiationType)}
+                  disabled={isRadiating}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alpha">
+                      <div className="flex items-center space-x-2">
+                        <Badge className="bg-red-500">{radiationProperties.alpha.symbol}</Badge>
+                        <span>Alpha-Strahlung</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="beta">
+                      <div className="flex items-center space-x-2">
+                        <Badge className="bg-blue-500">{radiationProperties.beta.symbol}</Badge>
+                        <span>Beta-Strahlung</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="gamma">
+                      <div className="flex items-center space-x-2">
+                        <Badge className="bg-green-500">{radiationProperties.gamma.symbol}</Badge>
+                        <span>Gamma-Strahlung</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="neutron">
+                      <div className="flex items-center space-x-2">
+                        <Badge className="bg-amber-500">{radiationProperties.neutron.symbol}</Badge>
+                        <span>Neutronen</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                <div className="mt-2 text-xs bg-blue-50 p-2 rounded">
+                  {radiationProperties[selectedRadiation].description}
+                </div>
+              </div>
+              
+              <div>
+                <div className="flex justify-between mb-1 items-center">
+                  <span className="text-sm font-medium">Strahlungsdosis</span>
+                  <span className="text-sm">{radiationDose} mSv/h</span>
+                </div>
+                <Slider 
+                  value={[radiationDose]}
+                  min={10}
+                  max={100}
+                  step={1}
+                  onValueChange={(values) => setRadiationDose(values[0])}
+                  disabled={isRadiating}
+                />
+                <div className="mt-1 text-xs text-gray-500 flex justify-between">
+                  <span>Gering</span>
+                  <span>Mittel</span>
+                  <span>Hoch</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="text-lg font-medium mb-4">Materialeigenschaften</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between mb-1 text-sm">
+                  <span>Strahlungsresistenz</span>
+                  <span>{materialProperties[activeTab as MaterialType].resistance}%</span>
+                </div>
+                <Progress value={materialProperties[activeTab as MaterialType].resistance} className="h-2" />
+              </div>
+              
+              <div>
+                <div className="flex justify-between mb-1 text-sm">
+                  <span>Kumulative Dosis</span>
+                  <span>{cumDose.toFixed(1)} mSv</span>
+                </div>
+                <Progress value={Math.min(100, cumDose)} className="h-2" />
+              </div>
+              
+              <div>
+                <div className="flex justify-between mb-1 text-sm">
+                  <span>Schadensgrad</span>
+                  <span className={cn(
+                    damageLevel < 30 ? "text-green-500" :
+                    damageLevel < 70 ? "text-amber-500" :
+                    "text-red-500"
+                  )}>
+                    {damageLevel.toFixed(1)}%
+                  </span>
+                </div>
+                <Progress 
+                  value={damageLevel} 
+                  className={cn(
+                    "h-2",
+                    damageLevel < 30 ? "bg-green-100" :
+                    damageLevel < 70 ? "bg-amber-100" :
+                    "bg-red-100"
+                  )}
+                  indicatorClassName={cn(
+                    damageLevel < 30 ? "bg-green-500" :
+                    damageLevel < 70 ? "bg-amber-500" :
+                    "bg-red-500"
+                  )}
+                />
+              </div>
+              
+              <div>
+                <div className="flex justify-between mb-1 text-sm">
+                  <span>Sichtbare Auswirkung</span>
+                  <span>{showEffects ? materialProperties[activeTab as MaterialType].effect : "Keine"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+      
+      <TabsContent value="dna" className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <h3 className="font-medium mb-2">DNA und Strahlung</h3>
+        <p className="text-sm">
+          DNA ist besonders empfindlich gegenüber ionisierender Strahlung. Alpha-Strahlung (α) kann bei direktem Kontakt 
+          schwere Schäden verursachen, während Gamma-Strahlung (γ) tiefer eindringt. Strahlenschäden an der DNA 
+          können zu Einzel- und Doppelstrangbrüchen führen, die wiederum zu Mutationen oder Zelltod führen können.
+        </p>
+      </TabsContent>
+      
+      <TabsContent value="metal" className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <h3 className="font-medium mb-2">Metalle und Strahlung</h3>
+        <p className="text-sm">
+          Metalle sind relativ strahlungsresistent, besonders gegenüber Alpha- (α) und Beta-Strahlung (β). 
+          Bei hohen Dosen können jedoch Elektronen aus der Metallgitterstruktur freigesetzt werden, was die 
+          mechanischen Eigenschaften des Metalls verändern kann. Langfristige Bestrahlung führt zu Versprödung 
+          und Materialermüdung.
+        </p>
+      </TabsContent>
+      
+      <TabsContent value="plastic" className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <h3 className="font-medium mb-2">Kunststoffe und Strahlung</h3>
+        <p className="text-sm">
+          Kunststoffe sind anfällig für Strahlungsschäden, da energiereiche Strahlung Polymerketten brechen kann. 
+          Dies führt zu Versprödung, Verfärbung und Strukturverlust. Gamma-Strahlung (γ) wird oft gezielt eingesetzt, 
+          um Kunststoffe zu sterilisieren oder ihre Eigenschaften zu modifizieren.
+        </p>
+      </TabsContent>
+      
+      <TabsContent value="crystal" className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <h3 className="font-medium mb-2">Kristalle und Strahlung</h3>
+        <p className="text-sm">
+          In Kristallen kann Strahlung Farbzentren erzeugen, indem Elektronen in Gitterfehlstellen eingefangen werden. 
+          Diese Zentren absorbieren Licht und können zum Leuchten angeregt werden. Dieses Phänomen wird in der 
+          Dosimetrie genutzt, um Strahlungsdosen zu messen. Es erklärt auch, warum manche Edelsteine ihre Farbe durch 
+          natürliche Bestrahlung über Millionen von Jahren erhalten haben.
+        </p>
+      </TabsContent>
     </Card>
   );
 };
