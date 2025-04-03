@@ -194,6 +194,140 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
       ctx.stroke();
     }
     
+    // Enhanced fusion visualization for kids
+    if (reactorType === 'fusion' && isRunning) {
+      // Draw plasma particles and fusion reactions
+      const plasmaRadius = Math.min(coreWidth, coreHeight) * 0.4;
+      
+      // Draw plasma containment field (magnetic field lines)
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.ellipse(
+          centerX, centerY,
+          plasmaRadius * 1.2, plasmaRadius * 1.2,
+          angle, 0, Math.PI * 2
+        );
+        ctx.strokeStyle = `rgba(59, 130, 246, ${0.5 + 0.5 * Math.sin(frameCount * 0.05)})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      
+      // Draw nucleus particles (deuterium and tritium or other fusion fuels)
+      const particleCount = Math.floor(20 + temperature / 1000000);
+      for (let i = 0; i < particleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * plasmaRadius;
+        const particleX = centerX + Math.cos(angle + frameCount * 0.01) * distance;
+        const particleY = centerY + Math.sin(angle + frameCount * 0.01) * distance;
+        
+        // Draw nuclei with different colors based on the fuel type
+        const particleSize = 4 + Math.random() * 3;
+        ctx.beginPath();
+        ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+        
+        // Different colors for different fuel types
+        if (Math.random() > 0.5) {
+          ctx.fillStyle = '#ff9500'; // Deuterium (orange)
+        } else {
+          ctx.fillStyle = '#00b3ff'; // Tritium (blue)
+        }
+        ctx.fill();
+        
+        // Add proton and neutron details for educational visuals
+        const miniParticleSize = particleSize / 2;
+        
+        // Proton (red)
+        ctx.beginPath();
+        ctx.arc(
+          particleX - miniParticleSize/2, 
+          particleY - miniParticleSize/2, 
+          miniParticleSize, 0, Math.PI * 2
+        );
+        ctx.fillStyle = '#ff5555';
+        ctx.fill();
+        
+        // Neutron (blue)
+        ctx.beginPath();
+        ctx.arc(
+          particleX + miniParticleSize/2, 
+          particleY + miniParticleSize/2, 
+          miniParticleSize, 0, Math.PI * 2
+        );
+        ctx.fillStyle = '#5555ff';
+        ctx.fill();
+      }
+      
+      // Draw fusion reactions with glowing effects
+      if (temperature > 100000000 && efficiency > 5) {
+        const reactionCount = Math.floor(efficiency / 10) + 1;
+        for (let i = 0; i < reactionCount; i++) {
+          if (Math.random() > 0.7) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * (plasmaRadius * 0.7);
+            const reactionX = centerX + Math.cos(angle) * distance;
+            const reactionY = centerY + Math.sin(angle) * distance;
+            
+            // Draw explosion-like glow
+            const gradient = ctx.createRadialGradient(
+              reactionX, reactionY, 0,
+              reactionX, reactionY, 20 + Math.random() * 10
+            );
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+            gradient.addColorStop(0.4, 'rgba(255, 220, 50, 0.7)');
+            gradient.addColorStop(1, 'rgba(255, 150, 50, 0)');
+            
+            ctx.beginPath();
+            ctx.arc(reactionX, reactionY, 20 + Math.random() * 10, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Draw energy rays coming out
+            const rayCount = 3 + Math.floor(Math.random() * 5);
+            for (let j = 0; j < rayCount; j++) {
+              const rayAngle = Math.random() * Math.PI * 2;
+              const rayLength = 10 + Math.random() * 20;
+              
+              ctx.beginPath();
+              ctx.moveTo(reactionX, reactionY);
+              ctx.lineTo(
+                reactionX + Math.cos(rayAngle) * rayLength,
+                reactionY + Math.sin(rayAngle) * rayLength
+              );
+              ctx.strokeStyle = 'rgba(255, 255, 100, 0.8)';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            }
+            
+            // Draw resulting helium nucleus
+            ctx.beginPath();
+            ctx.arc(reactionX, reactionY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffcc00';
+            ctx.fill();
+            ctx.strokeStyle = '#ff8800';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+      }
+      
+      // Add pulsing energy glow around the plasma
+      if (efficiency > 0) {
+        const glowRadius = plasmaRadius * (1.1 + 0.1 * Math.sin(frameCount * 0.1));
+        const glowGradient = ctx.createRadialGradient(
+          centerX, centerY, plasmaRadius * 0.8,
+          centerX, centerY, glowRadius
+        );
+        glowGradient.addColorStop(0, `rgba(255, 200, 50, ${efficiency/100})`);
+        glowGradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, glowRadius, 0, Math.PI * 2);
+        ctx.fillStyle = glowGradient;
+        ctx.fill();
+      }
+    }
+    
     // Generate energy particles for visual effect when running
     if (isRunning && temperature > 100) {
       const numEnergyParticles = Math.floor(efficiency / 10) + 1; // 1-10 particles based on efficiency

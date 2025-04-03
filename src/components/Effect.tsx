@@ -21,12 +21,13 @@ export const Effect = ({ type, x, y, onComplete, className, productType, targetP
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    // Significantly longer animation durations for better visibility for children
     const timer = setTimeout(() => {
       setIsVisible(false);
       if (onComplete) onComplete();
-    }, type === 'explosion' ? 800 : 
-       type === 'beta-decay' ? 1000 : 
-       type === 'dna-damage' ? 1500 : 500);
+    }, type === 'explosion' ? 1600 : 
+       type === 'beta-decay' ? 2000 : 
+       type === 'dna-damage' ? 3000 : 1500);
 
     return () => clearTimeout(timer);
   }, [type, onComplete]);
@@ -79,7 +80,8 @@ export const Effect = ({ type, x, y, onComplete, className, productType, targetP
               top: y - 25, 
               width: '50px', 
               height: '50px',
-              zIndex: 30
+              zIndex: 30,
+              animationDuration: '2s' // Slower animation
             }}
           />
         );
@@ -91,11 +93,12 @@ export const Effect = ({ type, x, y, onComplete, className, productType, targetP
               className
             )}
             style={{ 
-              left: x - 4, 
-              top: y - 4, 
-              width: '8px', 
-              height: '8px',
-              zIndex: 30
+              left: x - 5, // Slightly larger
+              top: y - 5, 
+              width: '10px', // Larger for better visibility
+              height: '10px',
+              zIndex: 30,
+              animationDuration: '3s' // Slower animation
             }}
           />
         );
@@ -107,11 +110,12 @@ export const Effect = ({ type, x, y, onComplete, className, productType, targetP
               className
             )}
             style={{ 
-              left: x - 6, 
-              top: y - 6, 
-              width: '12px', 
-              height: '12px',
-              zIndex: 30
+              left: x - 8, // Larger
+              top: y - 8, 
+              width: '16px', // Larger for better visibility
+              height: '16px',
+              zIndex: 30,
+              animationDuration: '2.5s' // Slower animation
             }}
           />
         );
@@ -123,11 +127,12 @@ export const Effect = ({ type, x, y, onComplete, className, productType, targetP
               className
             )}
             style={{ 
-              left: x - 20, 
-              top: y - 20, 
-              width: '40px', 
-              height: '40px',
-              zIndex: 30
+              left: x - 22, // Larger
+              top: y - 22, 
+              width: '44px', // Larger for better visibility
+              height: '44px',
+              zIndex: 30,
+              animationDuration: '1.5s' // Slower animation
             }}
           >
             {getProductLabel(productType)}
@@ -141,18 +146,18 @@ export const Effect = ({ type, x, y, onComplete, className, productType, targetP
               className
             )}
             style={{ 
-              left: x - 3, 
-              top: y - 3, 
-              width: '6px', 
-              height: '6px',
+              left: x - 4, // Larger
+              top: y - 4, 
+              width: '8px', // Larger for better visibility
+              height: '8px',
               zIndex: 30,
               transformOrigin: 'center',
               transform: targetPosition 
                 ? `translate(0, 0)`
                 : 'translate(0, 0)',
               animation: targetPosition 
-                ? `shoot 1s ease-out forwards`
-                : 'pulse 1s infinite'
+                ? `shoot 2.5s ease-out forwards` // Slower animation
+                : 'pulse 2s infinite'
             }}
           >
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[8px] font-bold text-white">e-</div>
@@ -166,12 +171,13 @@ export const Effect = ({ type, x, y, onComplete, className, productType, targetP
               className
             )}
             style={{ 
-              left: x - 15, 
-              top: y - 15, 
-              width: '30px', 
-              height: '30px',
+              left: x - 20, // Larger
+              top: y - 20, 
+              width: '40px', // Larger for better visibility
+              height: '40px',
               zIndex: 30,
-              opacity: 0.7
+              opacity: 0.7,
+              animationDuration: '2s' // Slower animation
             }}
           />
         );
@@ -188,16 +194,17 @@ export const Effect = ({ type, x, y, onComplete, className, productType, targetP
               className
             )}
             style={{ 
-              left: x - 10, 
-              top: y - 10, 
-              width: '20px', 
-              height: '20px',
+              left: x - 15, // Larger
+              top: y - 15, 
+              width: '30px', // Larger for better visibility
+              height: '30px',
               zIndex: 30,
-              boxShadow: '0 0 8px rgba(255, 50, 50, 0.8)'
+              boxShadow: '0 0 12px rgba(255, 50, 50, 0.8)', // More visible glow
+              animationDuration: damageLevel === 'mutation' ? '3s' : '2.5s' // Slower animation
             }}
           >
             {damageLevel === 'mutation' && (
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-[10px] font-bold">
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-[14px] font-bold">
                 M
               </div>
             )}
