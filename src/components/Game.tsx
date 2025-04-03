@@ -12,9 +12,10 @@ import ReactorLab from './ReactorLab';
 import FusionLab from './FusionLab';
 import ChainReactionSimulator from './ChainReactionSimulator';
 import RadiationEffectsLab from './RadiationEffectsLab';
+import MiniSunGame from './MiniSunGame';
 import { AtomProps } from './Atom';
 import { Button } from '@/components/ui/button';
-import { HelpCircle, ChevronDown, ChevronUp, Atom, Zap, FlaskConical, BarChart3, Radiation, Flame } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, Atom, Zap, FlaskConical, BarChart3, Radiation, Flame, Sun } from 'lucide-react';
 import { 
   Dialog,
   DialogContent,
@@ -183,7 +184,8 @@ export const Game = ({ className }: GameProps) => {
                 <p>8. Mit ausreichend Material kannst du eine Atombombe bauen.</p>
                 <p>9. Im Reaktorlabor kannst du einen Kernreaktor bauen und betreiben.</p>
                 <p>10. Experimentiere mit Fusion, um zu verstehen, wie Sterne funktionieren.</p>
-                <p>11. Versuche, die Energieanzeige zu füllen!</p>
+                <p>11. Baue deine eigene Mini-Sonne und beobachte, wie Kernfusion in Sternen stattfindet.</p>
+                <p>12. Versuche, die Energieanzeige zu füllen!</p>
               </DialogDescription>
             </DialogHeader>
           </DialogContent>
@@ -222,7 +224,7 @@ export const Game = ({ className }: GameProps) => {
       </div>
       
       <Tabs value={currentTab} onValueChange={setCurrentTab}>
-        <TabsList className="w-full grid grid-cols-7 mb-4">
+        <TabsList className="w-full grid grid-cols-8 mb-4">
           <TabsTrigger value="fission" className="flex items-center space-x-1">
             <Atom className="h-4 w-4" />
             <span>Kernspaltung</span>
@@ -242,6 +244,10 @@ export const Game = ({ className }: GameProps) => {
           <TabsTrigger value="fusion" className="flex items-center space-x-1">
             <Flame className="h-4 w-4" />
             <span>Fusion</span>
+          </TabsTrigger>
+          <TabsTrigger value="mini-sun" className="flex items-center space-x-1">
+            <Sun className="h-4 w-4" />
+            <span>Mini-Sonne</span>
           </TabsTrigger>
           <TabsTrigger value="chain-reaction" className="flex items-center space-x-1">
             <BarChart3 className="h-4 w-4" />
@@ -369,6 +375,12 @@ export const Game = ({ className }: GameProps) => {
           </div>
         </TabsContent>
         
+        <TabsContent value="mini-sun">
+          <MiniSunGame 
+            onEnergyProduced={handleEnergyProduced}
+          />
+        </TabsContent>
+        
         <TabsContent value="chain-reaction">
           <ChainReactionSimulator />
           
@@ -430,6 +442,7 @@ export const Game = ({ className }: GameProps) => {
               <ul className="list-disc list-inside mt-2 text-sm space-y-1">
                 <li>Baue und steuere verschiedene Reaktortypen im Reaktor-Labor</li>
                 <li>Entdecke Kernfusion und wie Sterne funktionieren im Fusions-Labor</li>
+                <li>Erschaffe deine eigene Mini-Sonne im Mini-Sonnen-Labor</li>
                 <li>Verstehe die Mathematik hinter Kettenreaktionen im Simulator</li>
                 <li>Erforsche die Auswirkungen von Strahlung auf verschiedene Materialien</li>
               </ul>
