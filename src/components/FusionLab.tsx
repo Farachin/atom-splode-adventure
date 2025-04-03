@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
@@ -171,7 +170,7 @@ const FusionLab = ({ energy, onEnergyProduced, className }: FusionLabProps) => {
       toast({
         title: "Stabile Fusion!",
         description: "Du hast eine stabile Fusionsreaktion erzeugt - wie in einem Stern!",
-        variant: "success"
+        variant: "default"
       });
       setSuccessMessage("Stabile Fusion wie in einem Stern! 🌞");
       
