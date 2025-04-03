@@ -194,7 +194,12 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
   const [effects, setEffects] = useState<FissionEffect[]>([]);
   const [draggingNeutronId, setDraggingNeutronId] = useState<string | null>(null);
   const [draggingNeutronSpeed, setDraggingNeutronSpeed] = useState<'slow' | 'fast'>('fast');
+  const [chainReactionActive, setChainReactionActive] = useState<boolean>(false);
+  const [totalEnergyReleased, setTotalEnergyReleased] = useState<number>(0);
+  const [maxEnergy, setMaxEnergy] = useState<number>(1000);
+  const [autoNeutronDelay, setAutoNeutronDelay] = useState<number>(800);
   const gameAreaRef = useRef<HTMLDivElement>(null);
+  const chainReactionRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -212,8 +217,25 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
       }]);
       setNeutrons([]);
       setEffects([]);
+      setChainReactionActive(false);
+      setTotalEnergyReleased(0);
     }
   }, [selectedElement]);
+
+  // Effect for chain reaction
+  useEffect(() => {
+    if (chainReactionActive && neutrons.length > 0 && elements.length > 0) {
+      chainReactionRef.current = setTimeout(() => {
+        processAutomaticChainReaction();
+      }, autoNeutronDelay);
+    }
+
+    return () => {
+      if (chainReactionRef.current) {
+        clearTimeout(chainReactionRef.current);
+      }
+    };
+  }, [chainReactionActive, neutrons, elements]);
 
   // Add a new effect for handling element decay
   useEffect(() => {
@@ -236,6 +258,36 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
       decayTimers.forEach(timer => clearTimeout(timer));
     };
   }, [elements]);
+
+  // New function to process automatic chain reactions
+  const processAutomaticChainReaction = () => {
+    if (neutrons.length === 0 || elements.length === 0 || totalEnergyReleased >= maxEnergy) {
+      setChainReactionActive(false);
+      return;
+    }
+
+    // Find a free neutron and an element to hit
+    const availableNeutron = neutrons.find(n => !n.isMoving);
+    if (!availableNeutron) return;
+
+    // Find a random element to target
+    const targetIndex = Math.floor(Math.random() * elements.length);
+    const targetElement = elements[targetIndex];
+
+    if (!targetElement) return;
+
+    // Move neutron towards the element
+    setNeutrons(prev => prev.map(neutron => 
+      neutron.id === availableNeutron.id 
+        ? { ...neutron, isMoving: true, targetPosition: targetElement.position } 
+        : neutron
+    ));
+    
+    // Schedule fission after animation
+    setTimeout(() => {
+      processElementFission(targetElement, availableNeutron.id, availableNeutron.speed, true);
+    }, 500);
+  };
 
   const handleAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!selectedElement) return;
@@ -303,6 +355,8 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
       // Schedule fission after animation
       setTimeout(() => {
         processElementFission(targetElement, draggingNeutronId!, draggingNeutronSpeed);
+        // Start chain reaction after initial fission
+        setChainReactionActive(true);
       }, 500);
     } else {
       // Just move the neutron to the new position
@@ -316,7 +370,7 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
     setDraggingNeutronId(null);
   };
 
-  const processElementFission = (element: AtomicElement, neutronId: string, neutronSpeed: 'slow' | 'fast') => {
+  const processElementFission = (element: AtomicElement, neutronId: string, neutronSpeed: 'slow' | 'fast', isAutomatic = false) => {
     const elementType = element.type as keyof typeof elementFissionProperties;
     const fissionProperties = elementFissionProperties[elementType];
     
@@ -339,11 +393,13 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
     if (fissionProperties.canAbsorb && fissionProperties.transformTo) {
       // Check for neutron speed preference for absorption
       if (fissionProperties.preferredNeutronSpeed === 'slow' && neutronSpeed === 'fast') {
-        toast({
-          title: "Zu schnelles Neutron",
-          description: `${elementType} kann nur langsame Neutronen effektiv absorbieren.`,
-          duration: 3000,
-        });
+        if (!isAutomatic) {
+          toast({
+            title: "Zu schnelles Neutron",
+            description: `${elementType} kann nur langsame Neutronen effektiv absorbieren.`,
+            duration: 3000,
+          });
+        }
         return;
       }
       
@@ -365,11 +421,13 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
         prev.map(el => el.id === element.id ? transformedElement : el)
       );
       
-      toast({
-        title: "Neutronenabsorption",
-        description: `${elementType} hat ein Neutron absorbiert und wurde zu ${fissionProperties.transformTo}`,
-        duration: 3000,
-      });
+      if (!isAutomatic) {
+        toast({
+          title: "Neutronenabsorption",
+          description: `${elementType} hat ein Neutron absorbiert und wurde zu ${fissionProperties.transformTo}`,
+          duration: 3000,
+        });
+      }
       
       return;
     }
@@ -384,6 +442,23 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
       
       // Remove the element that was split
       setElements(prev => prev.filter(e => e.id !== element.id));
+      
+      // Update total energy
+      const newTotalEnergy = totalEnergyReleased + fissionProperties.energyReleased;
+      setTotalEnergyReleased(newTotalEnergy);
+      
+      // If we've reached our energy limit, stop the chain reaction
+      if (newTotalEnergy >= maxEnergy) {
+        setChainReactionActive(false);
+        
+        if (!isAutomatic) {
+          toast({
+            title: "Maximale Energie erreicht!",
+            description: `Die Kettenreaktion hat ${newTotalEnergy.toFixed(0)} MeV Energie freigesetzt.`,
+            duration: 3000,
+          });
+        }
+      }
       
       // Create split products and released neutrons
       setTimeout(() => {
@@ -440,32 +515,36 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
         }
         setEffects(prev => [...prev, ...newEffects]);
         
-        // Notify about fission event
+        // Notify about fission event - only for non-automatic fissions to avoid too many toasts
         onFission(fissionProperties.energyReleased, fissionProperties.neutronReleased);
         
-        toast({
-          title: "Kernspaltung!",
-          description: `${fissionProperties.energyReleased} MeV Energie und ${fissionProperties.neutronReleased} Neutronen freigesetzt! Neue Elemente: ${fissionProperties.products.join(', ')}`,
-          duration: 3000,
-        });
+        if (!isAutomatic) {
+          toast({
+            title: "Kernspaltung!",
+            description: `${fissionProperties.energyReleased} MeV Energie und ${fissionProperties.neutronReleased} Neutronen freigesetzt! Neue Elemente: ${fissionProperties.products.join(', ')}`,
+            duration: 3000,
+          });
+        }
       }, 800);
     } else {
       // Failed fission
-      let failureReason = "";
-      
-      if (!fissionProperties.canFission) {
-        failureReason = `${elementType} ist nicht gut spaltbar.`;
-      } else if (speedProbabilityModifier < 1) {
-        failureReason = `${elementType} benötigt ${fissionProperties.preferredNeutronSpeed === 'slow' ? 'langsame' : 'schnelle'} Neutronen für optimale Spaltung.`;
-      } else {
-        failureReason = "Das Neutron hat den Kern nicht richtig getroffen.";
+      if (!isAutomatic) {
+        let failureReason = "";
+        
+        if (!fissionProperties.canFission) {
+          failureReason = `${elementType} ist nicht gut spaltbar.`;
+        } else if (speedProbabilityModifier < 1) {
+          failureReason = `${elementType} benötigt ${fissionProperties.preferredNeutronSpeed === 'slow' ? 'langsame' : 'schnelle'} Neutronen für optimale Spaltung.`;
+        } else {
+          failureReason = "Das Neutron hat den Kern nicht richtig getroffen.";
+        }
+        
+        toast({
+          title: "Keine Kernspaltung",
+          description: failureReason,
+          duration: 3000,
+        });
       }
-      
-      toast({
-        title: "Keine Kernspaltung",
-        description: failureReason,
-        duration: 3000,
-      });
     }
   };
 
@@ -523,6 +602,8 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
     // Schedule fission after animation
     setTimeout(() => {
       processElementFission(targetElement, neutronToFire.id, neutronToFire.speed);
+      // Start chain reaction after initial fission
+      setChainReactionActive(true);
     }, 500);
   };
 
@@ -597,6 +678,22 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {/* Status bar for chain reaction */}
+      {chainReactionActive && (
+        <div className="absolute top-0 left-0 right-0 bg-blue-600 text-white px-3 py-1 text-sm flex justify-between items-center z-50">
+          <span>Kettenreaktion aktiv</span>
+          <div className="flex items-center">
+            <span className="mr-2">Energie: {totalEnergyReleased.toFixed(0)} / {maxEnergy} MeV</span>
+            <div className="w-32 bg-blue-700 rounded-full h-2 mr-1">
+              <div 
+                className="bg-yellow-400 h-2 rounded-full" 
+                style={{width: `${Math.min(100, (totalEnergyReleased / maxEnergy) * 100)}%`}}
+              ></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Elements and Fission Products */}
       {elements.map((element) => {
         if (element.isProduct) {
@@ -696,6 +793,20 @@ export const GameArea = ({ selectedElement, onFission, className, neutronSpeed =
           <p className="text-lg font-medium text-gray-500">
             Wähle ein Element aus, um zu beginnen
           </p>
+        </div>
+      )}
+
+      {/* Instructions */}
+      {elements.length > 0 && neutrons.length === 0 && !chainReactionActive && (
+        <div className="absolute bottom-4 left-4 right-4 text-center bg-blue-100 p-2 rounded-lg text-sm">
+          Klicke irgendwo, um ein Neutron zu platzieren, oder verwende die Steuerung unten
+        </div>
+      )}
+
+      {/* Chain reaction status */}
+      {neutrons.length > 0 && !chainReactionActive && (
+        <div className="absolute bottom-4 left-4 right-4 text-center bg-blue-100 p-2 rounded-lg text-sm">
+          Ziehe ein Neutron auf den Atomkern, um die Kettenreaktion zu starten
         </div>
       )}
     </Card>

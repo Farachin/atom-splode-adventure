@@ -5,7 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Atom, Zap, Thermometer, Star, AlertTriangle } from 'lucide-react';
+import { 
+  ArrowDownCircle, 
+  Magnet, 
+  Zap, 
+  Thermometer, 
+  Atom, 
+  Flame, 
+  ArrowRightCircle 
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,618 +23,723 @@ interface FusionLabProps {
   className?: string;
 }
 
-type FusionFuel = 'hydrogen' | 'deuterium' | 'deuterium-tritium' | 'helium-3';
+type FusionFuel = 'deuterium-tritium' | 'deuterium-deuterium' | 'hydrogen-boron';
+type FusionStatus = 'idle' | 'heating' | 'fusion' | 'stable' | 'unstable';
 
 const FusionLab: React.FC<FusionLabProps> = ({ energy, onEnergyProduced, className }) => {
-  const [selectedFuel, setSelectedFuel] = useState<FusionFuel>('hydrogen');
-  const [temperature, setTemperature] = useState<number>(1000); // in kelvin
-  const [magneticField, setMagneticField] = useState<number>(50); // percentage
-  const [plasmaDensity, setPlasmaDensity] = useState<number>(50); // percentage
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [fusionRate, setFusionRate] = useState<number>(0); // percentage
+  const [fusionFuel, setFusionFuel] = useState<FusionFuel>('deuterium-tritium');
+  const [temperature, setTemperature] = useState<number>(0); // Millions of degrees Celsius
+  const [magneticField, setMagneticField] = useState<number>(50); // Tesla
+  const [plasmaConfinement, setPlasmaConfinement] = useState<number>(0); // 0-100%
+  const [fusionStatus, setFusionStatus] = useState<FusionStatus>('idle');
   const [energyOutput, setEnergyOutput] = useState<number>(0);
-  const [isMeltdown, setIsMeltdown] = useState<boolean>(false);
-  const [isSupernova, setIsSupernova] = useState<boolean>(false);
+  const [stepByStepMode, setStepByStepMode] = useState<boolean>(true);
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [fusionReactionVisible, setFusionReactionVisible] = useState<boolean>(false);
+  const fusionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
-  // Animation refs
-  const animationRef = useRef<number>(0);
-  const particlesRef = useRef<Array<{x: number, y: number, vx: number, vy: number, color: string, size: number}>>([]);
-
-  // Fuel properties
-  const fusionProperties = {
-    'hydrogen': {
-      name: 'Wasserstoff',
-      color: '#87CEFA',
-      ignitionTemp: 5000000,
-      energyFactor: 0.5,
-      description: 'Einfacher Wasserstoff ist am häufigsten, aber schwer zur Fusion zu bringen.'
-    },
-    'deuterium': {
-      name: 'Deuterium',
-      color: '#6495ED',
-      ignitionTemp: 400000000,
-      energyFactor: 1.0,
-      description: 'Schwerer Wasserstoff (Deuterium) ist leichter zu fusionieren als gewöhnlicher Wasserstoff.'
-    },
-    'deuterium-tritium': {
-      name: 'Deuterium-Tritium',
-      color: '#1E90FF',
-      ignitionTemp: 150000000,
-      energyFactor: 3.5,
-      description: 'Deuterium-Tritium-Fusion benötigt die niedrigste Temperatur und erzeugt viel Energie.'
-    },
-    'helium-3': {
-      name: 'Helium-3',
-      color: '#7B68EE',
-      ignitionTemp: 600000000,
-      energyFactor: 2.5,
-      description: 'Helium-3-Fusion erzeugt weniger Neutronen und ist sauberer, aber benötigt höhere Temperaturen.'
-    }
+  // Constants for different fusion fuels
+  const FUSION_THRESHOLDS = {
+    'deuterium-tritium': 150, // Million degrees
+    'deuterium-deuterium': 400, // Million degrees
+    'hydrogen-boron': 1000, // Million degrees
   };
 
-  // Initialize animation
+  const ENERGY_OUTPUT_RATES = {
+    'deuterium-tritium': 10,
+    'deuterium-deuterium': 5,
+    'hydrogen-boron': 20,
+  };
+
+  const CONFINEMENT_RATES = {
+    'deuterium-tritium': 1.0,
+    'deuterium-deuterium': 0.7,
+    'hydrogen-boron': 0.5,
+  };
+
+  // Animation for plasma and fusion reactions
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const animationInterval = setInterval(() => {
+      if (canvasRef.current) {
+        drawFusionVisualization();
+      }
+    }, 50);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    return () => clearInterval(animationInterval);
+  }, [fusionStatus, plasmaConfinement, temperature, fusionReactionVisible]);
 
-    const resizeCanvas = () => {
-      canvas.width = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
-    };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    // Initialize particles
-    initializeParticles();
+  // Effect for fusion process simulation
+  useEffect(() => {
+    if (fusionStatus === 'heating' || fusionStatus === 'fusion' || fusionStatus === 'stable') {
+      fusionIntervalRef.current = setInterval(() => {
+        processFusionStep();
+      }, 1000);
+    }
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      cancelAnimationFrame(animationRef.current);
+      if (fusionIntervalRef.current) {
+        clearInterval(fusionIntervalRef.current);
+      }
     };
-  }, []);
+  }, [fusionStatus, temperature, magneticField, plasmaConfinement]);
 
-  // Update animation when parameters change
-  useEffect(() => {
-    if (!isRunning) return;
-    
-    // Update particles behavior based on current parameters
-    updateParticlesBehavior();
-    
-    // Start animation if not already running
-    if (!animationRef.current) {
-      animateParticles();
-    }
-    
-    return () => {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = 0;
-    };
-  }, [isRunning, temperature, magneticField, plasmaDensity, selectedFuel]);
-
-  // React to supernova
-  useEffect(() => {
-    if (isSupernova) {
-      // Create supernova explosion effect
-      createSupernovaEffect();
-      
-      toast({
-        title: "Supernova!",
-        description: "Die Dichte und Temperatur haben einen kritischen Punkt erreicht! Sternenexplosion!",
-        variant: "destructive",
-      });
-      
-      // Reset after some time
-      const timeout = setTimeout(() => {
-        setIsSupernova(false);
-        setIsRunning(false);
-        setTemperature(1000);
-        setPlasmaDensity(50);
-        setMagneticField(50);
-        initializeParticles();
-      }, 5000);
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [isSupernova]);
-
-  // Effect for fusion simulation
-  useEffect(() => {
-    if (!isRunning) return;
-
-    const interval = setInterval(() => {
-      // Calculate fusion parameters
-      const ignitionTemp = fusionProperties[selectedFuel].ignitionTemp;
-      const tempRatio = temperature / ignitionTemp;
-      
-      // Calculate magnetic field stability
-      const magneticStability = magneticField / 100;
-      
-      // Calculate fusion rate based on temperature, density and magnetic field
-      let calculatedFusionRate = 0;
-      
-      if (tempRatio > 0.8) {
-        // Above 80% of ignition temperature, fusion starts to happen
-        calculatedFusionRate = Math.min(100, (tempRatio - 0.8) * 500);
-        
-        // Density increases fusion rate
-        calculatedFusionRate *= (plasmaDensity / 50);
-        
-        // Magnetic field controls stability
-        if (magneticStability < 0.4 && calculatedFusionRate > 20) {
-          // Risk of plasma escape
-          if (Math.random() < 0.2) {
-            handlePlasmaMeltdown();
-            return;
-          }
-        }
-      }
-      
-      // Check for supernova conditions
-      if (plasmaDensity > 90 && temperature > ignitionTemp * 2 && calculatedFusionRate > 80) {
-        if (Math.random() < 0.3) {
-          handleSupernova();
-          return;
-        }
-      }
-      
-      // Adjust temperature based on fusion rate
-      let newTemperature = temperature;
-      if (calculatedFusionRate > 0) {
-        // Fusion generates heat
-        newTemperature += calculatedFusionRate * 10000;
-      }
-      
-      // External heating
-      newTemperature += 5000;
-      
-      // Cooling effect from magnetic field
-      newTemperature *= (1 - 0.01 * magneticStability);
-      
+  const processFusionStep = () => {
+    // Update temperature based on status
+    if (fusionStatus === 'heating') {
+      // Heating phase
+      const heatRate = 10 + (magneticField / 10);
+      const newTemperature = Math.min(2000, temperature + heatRate);
       setTemperature(newTemperature);
-      setFusionRate(calculatedFusionRate);
       
+      // Calculate confinement based on magnetic field
+      const newConfinement = Math.min(100, plasmaConfinement + (magneticField / 20));
+      setPlasmaConfinement(newConfinement);
+      
+      // Check if we've reached fusion temperature
+      if (newTemperature >= FUSION_THRESHOLDS[fusionFuel]) {
+        setFusionStatus('fusion');
+        setFusionReactionVisible(true);
+        toast({
+          title: "Fusion initiiert!",
+          description: `Das Plasma hat die Zündtemperatur von ${FUSION_THRESHOLDS[fusionFuel]} Millionen °C erreicht.`,
+        });
+      }
+    } else if (fusionStatus === 'fusion' || fusionStatus === 'stable') {
+      // Fusion reaction ongoing
       // Calculate energy output
-      const output = calculatedFusionRate * fusionProperties[selectedFuel].energyFactor * 2;
+      const baseOutput = ENERGY_OUTPUT_RATES[fusionFuel];
+      const confinementFactor = CONFINEMENT_RATES[fusionFuel] * plasmaConfinement / 100;
+      const magnFieldFactor = magneticField / 100;
+      
+      // Energy output increases with confinement quality
+      const output = baseOutput * confinementFactor * magnFieldFactor * (temperature / FUSION_THRESHOLDS[fusionFuel]);
       setEnergyOutput(output);
+      onEnergyProduced(output / 5); // Scale down for game balance
       
-      // Contribute to game energy
-      onEnergyProduced(output / 100);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isRunning, selectedFuel, temperature, magneticField, plasmaDensity]);
-
-  // Initialize particles for visualization
-  const initializeParticles = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const numParticles = 100;
-    const particles = [];
-    
-    for (let i = 0; i < numParticles; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 2,
-        vy: (Math.random() - 0.5) * 2,
-        color: fusionProperties[selectedFuel].color,
-        size: Math.random() * 3 + 1
-      });
+      // Update status based on confinement quality
+      if (plasmaConfinement > 80 && magneticField > 70) {
+        if (fusionStatus !== 'stable') {
+          setFusionStatus('stable');
+          toast({
+            title: "Stabile Fusion erreicht!",
+            description: "Das Plasma ist nun stabil eingeschlossen und erzeugt konstant Energie.",
+          });
+        }
+      } else if (fusionStatus === 'stable') {
+        setFusionStatus('fusion');
+        toast({
+          title: "Instabilität im Plasma",
+          description: "Der Plasmaeinschluss ist nicht mehr optimal. Erhöhe das Magnetfeld!",
+        });
+      }
+      
+      // Random chance of instability based on confinement
+      if (Math.random() > (plasmaConfinement / 100)) {
+        // Lose some confinement
+        setPlasmaConfinement(prev => Math.max(0, prev - 5));
+        
+        if (plasmaConfinement < 30) {
+          // Plasma is becoming unstable
+          toast({
+            title: "Warnung: Plasmainstabilität",
+            description: "Der Magnetische Einschluss wird schwächer. Erhöhe das Magnetfeld!",
+            variant: "destructive"
+          });
+        }
+      }
     }
-    
-    particlesRef.current = particles;
   };
 
-  // Update particles behavior based on current parameters
-  const updateParticlesBehavior = () => {
-    const particles = particlesRef.current;
-    const fuel = selectedFuel;
-    const tempFactor = Math.min(1, temperature / fusionProperties[fuel].ignitionTemp);
-    const magFactor = magneticField / 100;
-    const densityFactor = plasmaDensity / 100;
+  const startFusion = () => {
+    if (fusionStatus !== 'idle') return;
     
-    particles.forEach(particle => {
-      // Update color
-      particle.color = fusionProperties[fuel].color;
-      
-      // Update velocity based on temperature
-      const speedMultiplier = 0.5 + tempFactor * 2;
-      particle.vx = (Math.random() - 0.5) * speedMultiplier;
-      particle.vy = (Math.random() - 0.5) * speedMultiplier;
-      
-      // Update size based on density
-      particle.size = Math.random() * 3 + 1 + densityFactor * 2;
+    setFusionStatus('heating');
+    setTemperature(20); // Start at 20 million degrees
+    
+    toast({
+      title: "Fusionsversuch gestartet",
+      description: stepByStepMode ? 
+        "Folge den Schritten, um eine Fusionsreaktion zu erzeugen." :
+        "Erhitze das Plasma auf die Zündtemperatur und optimiere den magnetischen Einschluss.",
     });
+  };
+
+  const stopFusion = () => {
+    if (fusionStatus === 'idle') return;
     
-    // Add more particles based on density
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    setFusionStatus('idle');
+    setTemperature(0);
+    setPlasmaConfinement(0);
+    setEnergyOutput(0);
+    setFusionReactionVisible(false);
+    setCurrentStep(1);
     
-    const targetParticleCount = 50 + Math.floor(densityFactor * 150);
+    toast({
+      title: "Fusionsreaktion gestoppt",
+      description: "Der Tokamak wurde heruntergefahren.",
+    });
+  };
+
+  const handleCompleteStep = (step: number) => {
+    if (currentStep !== step) return;
     
-    while (particles.length < targetParticleCount) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * (0.5 + tempFactor * 2),
-        vy: (Math.random() - 0.5) * (0.5 + tempFactor * 2),
-        color: fusionProperties[fuel].color,
-        size: Math.random() * 3 + 1 + densityFactor * 2
-      });
-    }
-    
-    // Remove excess particles
-    while (particles.length > targetParticleCount) {
-      particles.pop();
+    switch(step) {
+      case 1: // Select fuel
+        setCurrentStep(2);
+        toast({
+          title: "Schritt 1 abgeschlossen",
+          description: `${getFuelName(fusionFuel)} als Brennstoff ausgewählt.`,
+        });
+        break;
+      case 2: // Heat plasma
+        if (temperature < 50) {
+          setTemperature(50);
+        }
+        setCurrentStep(3);
+        toast({
+          title: "Schritt 2 abgeschlossen",
+          description: "Plasma wird erhitzt.",
+        });
+        break;
+      case 3: // Increase magnetic field
+        if (magneticField < 70) {
+          setMagneticField(70);
+        }
+        setCurrentStep(4);
+        toast({
+          title: "Schritt 3 abgeschlossen",
+          description: "Magnetfeld erhöht für besseren Plasmaeinschluss.",
+        });
+        break;
+      case 4: // Wait for fusion
+        if (fusionStatus !== 'heating') {
+          startFusion();
+        }
+        setCurrentStep(5);
+        toast({
+          title: "Schritt 4 abgeschlossen",
+          description: "Warte auf das Erreichen der Fusionstemperatur...",
+        });
+        break;
+      case 5: // Optimize for stable fusion
+        if (magneticField < 90) {
+          setMagneticField(90);
+        }
+        toast({
+          title: "Schritt 5 abgeschlossen",
+          description: "Gratulation! Du hast eine stabile Fusionsreaktion erzeugt!",
+        });
+        setStepByStepMode(false);
+        break;
     }
   };
 
-  // Animate particles
-  const animateParticles = () => {
+  const drawFusionVisualization = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    
+    // Set canvas size
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
     
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    const particles = particlesRef.current;
-    const magFactor = magneticField / 100;
-    
-    // Draw and update particles
-    particles.forEach(particle => {
-      // Draw particle
-      ctx.beginPath();
-      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-      ctx.fillStyle = particle.color;
-      ctx.fill();
-      
-      // Update position
-      particle.x += particle.vx;
-      particle.y += particle.vy;
-      
-      // Bounce off walls
-      if (particle.x < 0 || particle.x > canvas.width) {
-        particle.vx *= -1;
-      }
-      if (particle.y < 0 || particle.y > canvas.height) {
-        particle.vy *= -1;
-      }
-      
-      // Apply magnetic containment
-      if (isRunning && magFactor > 0.2) {
-        // Calculate distance from center
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const dx = particle.x - centerX;
-        const dy = particle.y - centerY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Apply containment force if near edge
-        const containerRadius = (canvas.width < canvas.height ? canvas.width : canvas.height) * 0.4;
-        if (distance > containerRadius) {
-          // Force directed toward center
-          const angle = Math.atan2(dy, dx);
-          const fx = -Math.cos(angle) * magFactor * 0.5;
-          const fy = -Math.sin(angle) * magFactor * 0.5;
-          
-          particle.vx += fx;
-          particle.vy += fy;
-        }
-      }
-    });
-    
-    // Draw fusion reactions if happening
-    if (isRunning && fusionRate > 10) {
-      const numReactions = Math.floor(fusionRate / 10);
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      
-      for (let i = 0; i < numReactions; i++) {
-        // Random position near center
-        const rx = centerX + (Math.random() - 0.5) * canvas.width * 0.3;
-        const ry = centerY + (Math.random() - 0.5) * canvas.height * 0.3;
-        
-        // Draw fusion flash
-        const grd = ctx.createRadialGradient(rx, ry, 0, rx, ry, 10 + Math.random() * 10);
-        grd.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
-        grd.addColorStop(1, 'rgba(255, 255, 0, 0)');
-        
-        ctx.beginPath();
-        ctx.arc(rx, ry, 10 + Math.random() * 10, 0, Math.PI * 2);
-        ctx.fillStyle = grd;
-        ctx.fill();
-      }
-    }
-    
-    // Continue animation
-    animationRef.current = requestAnimationFrame(animateParticles);
-  };
-
-  // Handle plasma meltdown
-  const handlePlasmaMeltdown = () => {
-    setIsMeltdown(true);
-    setIsRunning(false);
-    
-    toast({
-      title: "Plasma-Ausbruch!",
-      description: "Das Magnetfeld war zu schwach, um das Plasma zu halten!",
-      variant: "destructive",
-    });
-    
-    // Reset after some time
-    setTimeout(() => {
-      setIsMeltdown(false);
-      setTemperature(1000);
-    }, 3000);
-  };
-
-  // Handle supernova
-  const handleSupernova = () => {
-    setIsSupernova(true);
-    setEnergyOutput(10000);
-    onEnergyProduced(100); // Big energy boost from supernova
-  };
-
-  // Create supernova effect
-  const createSupernovaEffect = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const particles = particlesRef.current;
-    
-    // Clear existing particles
-    particles.length = 0;
-    
-    // Create explosion particles
+    // Calculate center and radius
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
+    const maxRadius = Math.min(centerX, centerY) * 0.8;
+
+    // Draw tokamak container (donut shape)
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
+    ctx.lineWidth = 15;
+    ctx.strokeStyle = '#777';
+    ctx.stroke();
     
-    for (let i = 0; i < 200; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 1 + Math.random() * 5;
+    // Draw magnetic field coils
+    const numCoils = 8;
+    for (let i = 0; i < numCoils; i++) {
+      const angle = (Math.PI * 2 / numCoils) * i;
+      const coilX = centerX + Math.cos(angle) * maxRadius;
+      const coilY = centerY + Math.sin(angle) * maxRadius;
       
-      particles.push({
-        x: centerX,
-        y: centerY,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        color: i % 3 === 0 ? '#FF5500' : i % 3 === 1 ? '#FFAA00' : '#FFFFFF',
-        size: 2 + Math.random() * 4
-      });
+      ctx.beginPath();
+      ctx.arc(coilX, coilY, 10, 0, Math.PI * 2);
+      ctx.fillStyle = magneticField > 50 ? '#3b82f6' : '#93c5fd';
+      ctx.fill();
+      
+      // Draw magnetic field lines
+      if (magneticField > 30) {
+        const fieldStrength = magneticField / 100;
+        const oppositeAngle = (angle + Math.PI) % (Math.PI * 2);
+        const oppositeX = centerX + Math.cos(oppositeAngle) * maxRadius;
+        const oppositeY = centerY + Math.sin(oppositeAngle) * maxRadius;
+        
+        ctx.beginPath();
+        ctx.moveTo(coilX, coilY);
+        
+        // Draw curved field line
+        const cp1x = centerX + Math.cos(angle - Math.PI/4) * maxRadius * 0.7;
+        const cp1y = centerY + Math.sin(angle - Math.PI/4) * maxRadius * 0.7;
+        const cp2x = centerX + Math.cos(oppositeAngle + Math.PI/4) * maxRadius * 0.7;
+        const cp2y = centerY + Math.sin(oppositeAngle + Math.PI/4) * maxRadius * 0.7;
+        
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, oppositeX, oppositeY);
+        
+        ctx.strokeStyle = `rgba(59, 130, 246, ${fieldStrength})`;
+        ctx.lineWidth = 2 * fieldStrength;
+        ctx.stroke();
+      }
+    }
+    
+    // Draw plasma
+    if (temperature > 0) {
+      const plasmaRadius = maxRadius * 0.7 * (plasmaConfinement / 100);
+      
+      // Plasma glow effect
+      const gradient = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, plasmaRadius
+      );
+      
+      let color1, color2;
+      if (temperature < FUSION_THRESHOLDS[fusionFuel] * 0.5) {
+        // Heating up - orange/red
+        color1 = 'rgba(255, 165, 0, 0.8)';
+        color2 = 'rgba(255, 120, 0, 0)';
+      } else if (temperature < FUSION_THRESHOLDS[fusionFuel]) {
+        // Near fusion - bright orange/yellow
+        color1 = 'rgba(255, 220, 50, 0.9)';
+        color2 = 'rgba(255, 150, 0, 0)';
+      } else {
+        // Fusion - bright blue/white
+        color1 = 'rgba(200, 230, 255, 1)';
+        color2 = 'rgba(70, 150, 255, 0)';
+      }
+      
+      gradient.addColorStop(0, color1);
+      gradient.addColorStop(1, color2);
+      
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, plasmaRadius, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      
+      // Fusion reactions - small energy particles emanating from center
+      if (fusionReactionVisible) {
+        const numParticles = 20 * (energyOutput / ENERGY_OUTPUT_RATES[fusionFuel]);
+        
+        for (let i = 0; i < numParticles; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const distance = Math.random() * plasmaRadius;
+          const particleX = centerX + Math.cos(angle) * distance;
+          const particleY = centerY + Math.sin(angle) * distance;
+          const particleSize = 1 + Math.random() * 2;
+          
+          ctx.beginPath();
+          ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.fill();
+          
+          // Energy rays for higher energy output
+          if (energyOutput > ENERGY_OUTPUT_RATES[fusionFuel] * 0.5 && Math.random() > 0.8) {
+            const rayLength = 10 + Math.random() * 20;
+            const rayEndX = particleX + Math.cos(angle) * rayLength;
+            const rayEndY = particleY + Math.sin(angle) * rayLength;
+            
+            ctx.beginPath();
+            ctx.moveTo(particleX, particleY);
+            ctx.lineTo(rayEndX, rayEndY);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+      }
     }
   };
 
-  // Start the fusion reactor
-  const handleStartFusion = () => {
-    if (isRunning) return;
-    setIsRunning(true);
-    
-    toast({
-      title: "Fusion gestartet",
-      description: `Fusion mit ${fusionProperties[selectedFuel].name} begonnen.`,
-    });
-  };
-
-  // Stop the fusion reactor
-  const handleStopFusion = () => {
-    if (!isRunning) return;
-    setIsRunning(false);
-    
-    toast({
-      title: "Fusion gestoppt",
-      description: "Der Fusionsreaktor wurde sicher heruntergefahren.",
-    });
-  };
-
-  // Format temperature for display
-  const formatTemperature = (temp: number): string => {
-    if (temp >= 1000000) {
-      return `${(temp / 1000000).toFixed(2)} Mio K`;
-    } else if (temp >= 1000) {
-      return `${(temp / 1000).toFixed(2)} tausend K`;
+  const getFuelName = (fuel: FusionFuel): string => {
+    switch(fuel) {
+      case 'deuterium-tritium': return 'Deuterium-Tritium';
+      case 'deuterium-deuterium': return 'Deuterium-Deuterium';
+      case 'hydrogen-boron': return 'Wasserstoff-Bor (p-B11)';
+      default: return '';
     }
-    return `${temp.toFixed(0)} K`;
   };
 
   return (
-    <Card className={cn("p-6 bg-white overflow-hidden", className)}>
+    <Card className={cn("p-6 bg-white", className)}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Sternenphysik-Labor</h2>
+          <h2 className="text-2xl font-bold">Tokamak Fusionsreaktor</h2>
           <Badge 
-            variant={isRunning ? "default" : "outline"}
+            variant={fusionStatus !== 'idle' ? "default" : "outline"}
             className={cn(
               "px-3 py-1",
-              isRunning ? "bg-yellow-500 hover:bg-yellow-600" : "text-gray-500"
+              fusionStatus === 'stable' ? "bg-green-500 hover:bg-green-600" : 
+              fusionStatus === 'fusion' ? "bg-blue-500 hover:bg-blue-600" :
+              fusionStatus === 'heating' ? "bg-orange-500 hover:bg-orange-600" :
+              "text-gray-500"
             )}
           >
-            {isRunning ? "Aktiv" : "Inaktiv"}
+            {fusionStatus === 'idle' ? "Inaktiv" : 
+             fusionStatus === 'heating' ? "Aufheizphase" :
+             fusionStatus === 'fusion' ? "Fusionsreaktion" :
+             fusionStatus === 'stable' ? "Stabile Fusion" : 
+             "Unbekannt"}
           </Badge>
         </div>
-        
-        <div className="relative rounded-lg overflow-hidden bg-gray-900 h-48 mb-4">
-          <canvas 
-            ref={canvasRef} 
-            className="absolute inset-0 w-full h-full"
-          />
-          {(!isRunning && !isMeltdown && !isSupernova) && (
-            <div className="absolute inset-0 flex items-center justify-center text-white">
-              <div className="text-center">
-                <Star className="h-10 w-10 mb-2 mx-auto text-yellow-300" />
-                <p>Wähle Brennstoff und starte die Fusion</p>
-              </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            {/* Fusion visualizer */}
+            <div className="bg-gray-900 rounded-lg p-2 h-[300px] relative">
+              <canvas 
+                ref={canvasRef} 
+                className="w-full h-full"
+              />
+              
+              {/* Step-by-step guide overlay */}
+              {stepByStepMode && (
+                <div className="absolute inset-0 p-4 flex flex-col justify-end">
+                  <div className="bg-black bg-opacity-70 p-3 rounded-lg text-white">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-medium">Schritte zur Fusion</h3>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-xs h-6 bg-white text-black"
+                        onClick={() => setStepByStepMode(false)}
+                      >
+                        Überspringen
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-2 text-sm">
+                      <div className={cn(
+                        "flex items-center",
+                        currentStep === 1 ? "text-white" : currentStep > 1 ? "text-green-400" : "text-gray-400"
+                      )}>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center mr-2 bg-gray-800">
+                          {currentStep > 1 ? "✓" : "1"}
+                        </div>
+                        <span className="flex-1">Wähle einen Brennstoff</span>
+                        {currentStep === 1 && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-6 text-xs"
+                            onClick={() => handleCompleteStep(1)}
+                          >
+                            Weiter
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className={cn(
+                        "flex items-center",
+                        currentStep === 2 ? "text-white" : currentStep > 2 ? "text-green-400" : "text-gray-400"
+                      )}>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center mr-2 bg-gray-800">
+                          {currentStep > 2 ? "✓" : "2"}
+                        </div>
+                        <span className="flex-1">Erhitze das Plasma</span>
+                        {currentStep === 2 && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-6 text-xs"
+                            onClick={() => handleCompleteStep(2)}
+                          >
+                            Weiter
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className={cn(
+                        "flex items-center",
+                        currentStep === 3 ? "text-white" : currentStep > 3 ? "text-green-400" : "text-gray-400"
+                      )}>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center mr-2 bg-gray-800">
+                          {currentStep > 3 ? "✓" : "3"}
+                        </div>
+                        <span className="flex-1">Erhöhe das Magnetfeld</span>
+                        {currentStep === 3 && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-6 text-xs"
+                            onClick={() => handleCompleteStep(3)}
+                          >
+                            Weiter
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className={cn(
+                        "flex items-center",
+                        currentStep === 4 ? "text-white" : currentStep > 4 ? "text-green-400" : "text-gray-400"
+                      )}>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center mr-2 bg-gray-800">
+                          {currentStep > 4 ? "✓" : "4"}
+                        </div>
+                        <span className="flex-1">Starte die Fusion</span>
+                        {currentStep === 4 && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-6 text-xs"
+                            onClick={() => handleCompleteStep(4)}
+                          >
+                            Weiter
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className={cn(
+                        "flex items-center",
+                        currentStep === 5 ? "text-white" : currentStep > 5 ? "text-green-400" : "text-gray-400"
+                      )}>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center mr-2 bg-gray-800">
+                          {currentStep > 5 ? "✓" : "5"}
+                        </div>
+                        <span className="flex-1">Optimiere für stabile Fusion</span>
+                        {currentStep === 5 && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-6 text-xs"
+                            onClick={() => handleCompleteStep(5)}
+                          >
+                            Fertig
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Empty state message */}
+              {fusionStatus === 'idle' && !stepByStepMode && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <p className="text-white text-lg font-medium text-center bg-black bg-opacity-50 p-4 rounded-lg">
+                    Drücke "Fusion starten", um einen Fusionsversuch zu beginnen
+                  </p>
+                </div>
+              )}
             </div>
-          )}
-          {isMeltdown && (
-            <div className="absolute inset-0 flex items-center justify-center text-white bg-red-500 bg-opacity-50">
-              <div className="text-center">
-                <AlertTriangle className="h-10 w-10 mb-2 mx-auto text-white" />
-                <p className="font-bold">Plasma-Ausbruch!</p>
-              </div>
-            </div>
-          )}
-          {isSupernova && (
-            <div className="absolute inset-0 flex items-center justify-center text-white">
-              <div className="text-center">
-                <Star className="h-16 w-16 mb-2 mx-auto text-yellow-300 animate-pulse" />
-                <p className="font-bold text-2xl">SUPERNOVA!</p>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-4">
-            <h3 className="font-medium">Brennstoff wählen</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(fusionProperties) as FusionFuel[]).map((fuel) => (
+            
+            {/* Controls */}
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-3 gap-3">
                 <Button 
-                  key={fuel}
                   className={cn(
-                    "h-16 flex-col items-center justify-center space-y-1 text-left text-sm",
-                    selectedFuel === fuel ? "border-2 border-primary" : "border"
+                    "flex flex-col h-auto py-2",
+                    fusionFuel === 'deuterium-tritium' && "border-2 border-primary"
                   )}
                   variant="outline"
-                  onClick={() => !isRunning && setSelectedFuel(fuel)}
-                  disabled={isRunning}
-                  style={{
-                    borderColor: selectedFuel === fuel ? 'var(--primary)' : undefined,
-                    backgroundColor: selectedFuel === fuel ? `${fusionProperties[fuel].color}15` : undefined
-                  }}
+                  onClick={() => setFusionFuel('deuterium-tritium')}
+                  disabled={fusionStatus !== 'idle'}
                 >
-                  <span className="font-bold">{fusionProperties[fuel].name}</span>
-                  <span className="text-xs">
-                    {formatTemperature(fusionProperties[fuel].ignitionTemp)} Zündtemp.
-                  </span>
+                  <Atom className="h-6 w-6 mb-1" />
+                  <span className="text-xs">D-T</span>
                 </Button>
-              ))}
-            </div>
-            
-            <div className="bg-blue-50 rounded-lg p-3 text-sm">
-              <h4 className="font-medium mb-1">{fusionProperties[selectedFuel].name}</h4>
-              <p>{fusionProperties[selectedFuel].description}</p>
+                
+                <Button 
+                  className={cn(
+                    "flex flex-col h-auto py-2",
+                    fusionFuel === 'deuterium-deuterium' && "border-2 border-primary"
+                  )}
+                  variant="outline"
+                  onClick={() => setFusionFuel('deuterium-deuterium')}
+                  disabled={fusionStatus !== 'idle'}
+                >
+                  <Atom className="h-6 w-6 mb-1" />
+                  <span className="text-xs">D-D</span>
+                </Button>
+                
+                <Button 
+                  className={cn(
+                    "flex flex-col h-auto py-2",
+                    fusionFuel === 'hydrogen-boron' && "border-2 border-primary"
+                  )}
+                  variant="outline"
+                  onClick={() => setFusionFuel('hydrogen-boron')}
+                  disabled={fusionStatus !== 'idle'}
+                >
+                  <Atom className="h-6 w-6 mb-1" />
+                  <span className="text-xs">p-B11</span>
+                </Button>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center">
+                      <Thermometer className="h-4 w-4 mr-1 text-red-500" />
+                      <span>Temperatur</span>
+                    </div>
+                    <span className="text-sm font-bold">{temperature.toFixed(0)} Mio. °C</span>
+                  </div>
+                  <Progress 
+                    value={Math.min(100, (temperature / FUSION_THRESHOLDS[fusionFuel]) * 100)} 
+                    className={cn(
+                      "h-2",
+                      temperature >= FUSION_THRESHOLDS[fusionFuel] ? "bg-blue-200" : "bg-red-200"
+                    )}
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0</span>
+                    <span>{FUSION_THRESHOLDS[fusionFuel]} Mio. °C</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center">
+                      <Magnet className="h-4 w-4 mr-1 text-blue-500" />
+                      <span>Magnetfeld</span>
+                    </div>
+                    <span className="text-sm font-bold">{magneticField.toFixed(0)} Tesla</span>
+                  </div>
+                  <Slider
+                    value={[magneticField]}
+                    onValueChange={values => setMagneticField(values[0])}
+                    max={100}
+                    step={1}
+                    disabled={fusionStatus === 'idle'}
+                  />
+                </div>
+                
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center">
+                      <ArrowDownCircle className="h-4 w-4 mr-1 text-purple-500" />
+                      <span>Plasmaeinschluss</span>
+                    </div>
+                    <span className="text-sm font-bold">{plasmaConfinement.toFixed(0)}%</span>
+                  </div>
+                  <Progress 
+                    value={plasmaConfinement} 
+                    className={cn(
+                      "h-2",
+                      plasmaConfinement >= 80 ? "bg-green-200" : 
+                      plasmaConfinement >= 50 ? "bg-blue-200" : 
+                      plasmaConfinement >= 30 ? "bg-yellow-200" : "bg-red-200"
+                    )}
+                  />
+                </div>
+              </div>
             </div>
           </div>
           
           <div className="space-y-4">
-            <h3 className="font-medium">Kontrollparameter</h3>
-            
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span>Magnetfeld-Stärke</span>
-                <span>{magneticField}%</span>
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+              <h3 className="font-medium mb-2">Gewählter Brennstoff: {getFuelName(fusionFuel)}</h3>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Zündtemperatur:</span>
+                  <span>{FUSION_THRESHOLDS[fusionFuel]} Millionen °C</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Energieausbeute:</span>
+                  <span>{ENERGY_OUTPUT_RATES[fusionFuel] * 10} MeV pro Fusion</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Benötigter Einschluss:</span>
+                  <span>{CONFINEMENT_RATES[fusionFuel] * 100}%</span>
+                </div>
               </div>
-              <Slider
-                value={[magneticField]}
-                onValueChange={values => setMagneticField(values[0])}
-                max={100}
-                step={1}
-                disabled={!isRunning || isMeltdown || isSupernova}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Steuert, wie gut das Plasma eingeschlossen bleibt
+              
+              <p className="mt-4 text-sm">
+                {fusionFuel === 'deuterium-tritium' ? 
+                  "Die D-T Fusion ist die 'einfachste' Fusion mit niedrigerer Zündtemperatur, aber Tritium ist radioaktiv und selten." :
+                fusionFuel === 'deuterium-deuterium' ? 
+                  "D-D Fusion vermeidet Tritium, benötigt aber höhere Temperaturen und hat geringere Energieausbeute." :
+                  "Die aneutrische Proton-Bor-Fusion (p-B11) ist strahlungsarm aber extrem schwer zu erreichen."}
               </p>
             </div>
             
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span>Plasma-Dichte</span>
-                <span>{plasmaDensity}%</span>
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="mb-4">
+                <h3 className="font-medium mb-2 flex items-center">
+                  <Zap className="h-5 w-5 mr-1 text-yellow-500" />
+                  <span>Energieproduktion</span>
+                </h3>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Aktueller Output:</span>
+                    <span className="font-bold">{energyOutput.toFixed(1)} MW</span>
+                  </div>
+                  
+                  <Progress 
+                    value={Math.min(100, (energyOutput / (ENERGY_OUTPUT_RATES[fusionFuel] * 2)) * 100)} 
+                    className="h-3 bg-gray-200"
+                  />
+                  
+                  <div className="text-sm text-center mt-1">
+                    {fusionStatus === 'stable' ? (
+                      <span className="text-green-600">Stabile Fusionsreaktion!</span>
+                    ) : fusionStatus === 'fusion' ? (
+                      <span className="text-blue-600">Fusionsreaktion läuft</span>
+                    ) : fusionStatus === 'heating' ? (
+                      <span className="text-orange-600">Plasma wird erhitzt</span>
+                    ) : (
+                      <span className="text-gray-600">Reaktor inaktiv</span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <Slider
-                value={[plasmaDensity]}
-                onValueChange={values => setPlasmaDensity(values[0])}
-                max={100}
-                step={1}
-                disabled={!isRunning || isMeltdown || isSupernova}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Höhere Dichte = mehr Fusionsreaktionen, aber höheres Risiko
-              </p>
+              
+              <div className="text-sm bg-blue-50 p-3 rounded-lg mb-4">
+                <h4 className="font-medium">Wusstest du?</h4>
+                <p className="mt-1">
+                  Kernfusion ist der Prozess, der Sterne antreibt. Im Inneren unserer Sonne verschmelzen 
+                  bei etwa 15 Millionen Grad Wasserstoffkerne zu Helium, wobei enorme Energiemengen freigesetzt werden.
+                </p>
+              </div>
+              
+              <div className="flex space-x-3">
+                <Button 
+                  className="flex-1" 
+                  onClick={startFusion}
+                  disabled={fusionStatus !== 'idle'}
+                >
+                  <Flame className="h-4 w-4 mr-2" />
+                  Fusion starten
+                </Button>
+                
+                <Button 
+                  className="flex-1" 
+                  variant="outline" 
+                  onClick={stopFusion}
+                  disabled={fusionStatus === 'idle'}
+                >
+                  Stoppen
+                </Button>
+                
+                {!stepByStepMode && (
+                  <Button 
+                    className="flex-none" 
+                    variant="outline" 
+                    onClick={() => {setStepByStepMode(true); setCurrentStep(1);}}
+                    disabled={fusionStatus !== 'idle'}
+                  >
+                    <ArrowRightCircle className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center">
-                <Thermometer className="h-5 w-5 mr-2 text-red-500" />
-                <span className="font-medium">Temperatur</span>
-              </div>
-              <span className="font-bold text-gray-700">
-                {formatTemperature(temperature)}
-              </span>
-            </div>
-            <Progress 
-              value={Math.min(100, (temperature / fusionProperties[selectedFuel].ignitionTemp) * 100)} 
-              className={temperature >= fusionProperties[selectedFuel].ignitionTemp * 0.8 ? "bg-orange-500" : ""}
-            />
-            <div className="flex justify-between mt-1 text-xs text-gray-500">
-              <span>0 K</span>
-              <span>Zündtemperatur: {formatTemperature(fusionProperties[selectedFuel].ignitionTemp)}</span>
-            </div>
-          </div>
-          
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center">
-                <Atom className="h-5 w-5 mr-2 text-blue-500" />
-                <span className="font-medium">Fusionsrate</span>
-              </div>
-              <span className="font-bold text-gray-700">{fusionRate.toFixed(1)}%</span>
-            </div>
-            <Progress value={fusionRate} className="bg-blue-500" />
-            <div className="flex justify-between mt-1 text-xs text-gray-500">
-              <span>Energieausbeute: {energyOutput.toFixed(1)} MW</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex space-x-4">
-          {(!isMeltdown && !isSupernova) ? (
-            <>
-              <Button 
-                className="flex-1" 
-                onClick={handleStartFusion}
-                disabled={isRunning}
-              >
-                Fusion starten
-              </Button>
-              <Button 
-                className="flex-1" 
-                variant="outline" 
-                onClick={handleStopFusion}
-                disabled={!isRunning}
-              >
-                Fusion stoppen
-              </Button>
-            </>
-          ) : (
-            <Button 
-              className="flex-1 bg-orange-500 hover:bg-orange-600" 
-              onClick={() => {
-                setIsMeltdown(false);
-                setIsSupernova(false);
-                setTemperature(1000);
-                setPlasmaDensity(50);
-                setMagneticField(50);
-                initializeParticles();
-              }}
-            >
-              Labor zurücksetzen
-            </Button>
-          )}
         </div>
       </div>
     </Card>

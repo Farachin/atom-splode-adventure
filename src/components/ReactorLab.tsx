@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Thermometer, Droplets, Zap, Fan, Atom, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import ReactorVisualizer from './ReactorVisualizer';
 
 interface ReactorLabProps {
   energy: number;
@@ -239,267 +240,289 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
           </Badge>
         </div>
 
-        <Tabs defaultValue="reactor-type" className="w-full">
-          <TabsList className="grid grid-cols-3 mb-4">
-            <TabsTrigger value="reactor-type">Reaktortyp</TabsTrigger>
-            <TabsTrigger value="cooling">Kühlsystem</TabsTrigger>
-            <TabsTrigger value="control">Steuerung</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="reactor-type" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button 
-                className={cn(
-                  "h-24 flex-col items-center justify-center space-y-2 text-left",
-                  reactorType === 'pressurized-water' ? "border-4 border-primary" : "border"
-                )}
-                variant="outline"
-                onClick={() => {
-                  setReactorType('pressurized-water');
-                  setCoolantType('water');
-                }}
-              >
-                <div className="flex items-center">
-                  <Droplets className="h-5 w-5 mr-2 text-blue-500" />
-                  <span className="font-bold">Druckwasserreaktor</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            {/* Reactor visualizer */}
+            <ReactorVisualizer 
+              temperature={temperature}
+              coolantFlow={coolantFlow}
+              controlRodLevel={controlRodLevel}
+              isRunning={isRunning}
+              coolantType={coolantType}
+              efficiency={efficiency}
+              reactorType={reactorType}
+              isStable={isStable}
+              warningLevel={warningLevel}
+              className="h-64 mb-4"
+            />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Thermometer className="h-5 w-5 mr-2 text-red-500" />
+                    <span className="font-medium">Temperatur</span>
+                  </div>
+                  <span className={cn(
+                    "font-bold",
+                    temperature > MELTDOWN_TEMPERATURE * 0.9 ? "text-red-500" : 
+                    temperature > MELTDOWN_TEMPERATURE * 0.7 ? "text-orange-500" : "text-gray-700"
+                  )}>
+                    {getTemperatureDisplay()}
+                  </span>
                 </div>
-                <p className="text-xs text-gray-500">Sicher & zuverlässig, niedrige Effizienz</p>
-              </Button>
+                <Progress value={(temperature / MAX_TEMPERATURE) * 100} className={getWarningColor()} />
+                {warningLevel === 'high' && (
+                  <div className="flex items-center mt-2 text-red-500 text-sm">
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    <span>Kritisch! Kühlung erhöhen!</span>
+                  </div>
+                )}
+              </div>
               
-              <Button 
-                className={cn(
-                  "h-24 flex-col items-center justify-center space-y-2 text-left",
-                  reactorType === 'fast-breeder' ? "border-4 border-primary" : "border"
-                )}
-                variant="outline"
-                onClick={() => {
-                  setReactorType('fast-breeder');
-                  setCoolantType('sodium');
-                }}
-              >
-                <div className="flex items-center">
-                  <Atom className="h-5 w-5 mr-2 text-purple-500" />
-                  <span className="font-bold">Schneller Brüter</span>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Zap className="h-5 w-5 mr-2 text-yellow-500" />
+                    <span className="font-medium">Energieausbeute</span>
+                  </div>
+                  <span className="font-bold text-gray-700">{energyOutput.toFixed(1)} MW</span>
                 </div>
-                <p className="text-xs text-gray-500">Erzeugt Plutonium, höhere Effizienz</p>
-              </Button>
-              
-              <Button 
-                className={cn(
-                  "h-24 flex-col items-center justify-center space-y-2 text-left",
-                  reactorType === 'fusion' ? "border-4 border-primary" : "border"
-                )}
-                variant="outline"
-                onClick={() => {
-                  setReactorType('fusion');
-                  setCoolantType('helium');
-                }}
-              >
-                <div className="flex items-center">
-                  <Zap className="h-5 w-5 mr-2 text-yellow-500" />
-                  <span className="font-bold">Fusionsreaktor</span>
+                <Progress value={efficiency} className="bg-gray-200" />
+                <div className="flex justify-between mt-2 text-sm text-gray-500">
+                  <span>Wirkungsgrad: {efficiency.toFixed(1)}%</span>
                 </div>
-                <p className="text-xs text-gray-500">Sehr hohe Effizienz, schwer zu starten</p>
-              </Button>
+              </div>
             </div>
             
-            <div className="bg-blue-50 rounded-lg p-4 text-sm">
-              <h3 className="font-medium mb-2">Info: {getReactorName(reactorType)}</h3>
-              {reactorType === 'pressurized-water' && (
-                <p>Verwendet Wasser unter hohem Druck als Kühlmittel und Moderator. 
-                   Ein sicherer Reaktortyp, der in den meisten Kernkraftwerken verwendet wird.</p>
+            <div className="flex space-x-4 mt-4">
+              {isStable ? (
+                <>
+                  <Button 
+                    className="flex-1" 
+                    onClick={handleStartReactor}
+                    disabled={isRunning}
+                  >
+                    Reaktor starten
+                  </Button>
+                  <Button 
+                    className="flex-1" 
+                    variant="outline" 
+                    onClick={handleStopReactor}
+                    disabled={!isRunning}
+                  >
+                    Reaktor stoppen
+                  </Button>
+                </>
+              ) : (
+                <Button 
+                  className="flex-1 bg-red-500 hover:bg-red-600" 
+                  onClick={handleResetReactor}
+                >
+                  Reaktor wieder aufbauen
+                </Button>
               )}
-              {reactorType === 'fast-breeder' && (
-                <p>Nutzt schnelle Neutronen und flüssiges Natrium als Kühlmittel. Kann neuen Brennstoff (Plutonium) 
-                   erzeugen, während er Energie produziert.</p>
-              )}
-              {reactorType === 'fusion' && (
-                <p>Verschmilzt Wasserstoffisotope zu Helium, ähnlich wie in der Sonne. 
-                   Benötigt extrem hohe Temperaturen und starke Magnetfelder, produziert aber viel Energie.</p>
-              )}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="cooling" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button 
-                className={cn(
-                  "h-24 flex-col items-center justify-center space-y-2 text-left",
-                  coolantType === 'water' ? "border-4 border-primary" : "border",
-                  reactorType === 'fusion' ? "opacity-50" : ""
-                )}
-                variant="outline"
-                onClick={() => reactorType !== 'fusion' && setCoolantType('water')}
-                disabled={reactorType === 'fusion'}
-              >
-                <div className="flex items-center">
-                  <Droplets className="h-5 w-5 mr-2 text-blue-500" />
-                  <span className="font-bold">Wasser</span>
-                </div>
-                <p className="text-xs text-gray-500">Gute Kühlung, sicher</p>
-              </Button>
-              
-              <Button 
-                className={cn(
-                  "h-24 flex-col items-center justify-center space-y-2 text-left",
-                  coolantType === 'sodium' ? "border-4 border-primary" : "border",
-                  reactorType === 'fusion' ? "opacity-50" : ""
-                )}
-                variant="outline"
-                onClick={() => reactorType !== 'fusion' && setCoolantType('sodium')}
-                disabled={reactorType === 'fusion'}
-              >
-                <div className="flex items-center">
-                  <Thermometer className="h-5 w-5 mr-2 text-orange-500" />
-                  <span className="font-bold">Flüssiges Natrium</span>
-                </div>
-                <p className="text-xs text-gray-500">Sehr effiziente Kühlung, reagiert mit Wasser</p>
-              </Button>
-              
-              <Button 
-                className={cn(
-                  "h-24 flex-col items-center justify-center space-y-2 text-left",
-                  coolantType === 'helium' ? "border-4 border-primary" : "border"
-                )}
-                variant="outline"
-                onClick={() => setCoolantType('helium')}
-              >
-                <div className="flex items-center">
-                  <Fan className="h-5 w-5 mr-2 text-purple-500" />
-                  <span className="font-bold">Helium-Gas</span>
-                </div>
-                <p className="text-xs text-gray-500">Für Hochtemperatur-Reaktoren, weniger effizient</p>
-              </Button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span>Kühlmittelfluss</span>
-                  <span>{coolantFlow}%</span>
-                </div>
-                <Slider
-                  value={[coolantFlow]}
-                  onValueChange={values => setCoolantFlow(values[0])}
-                  max={100}
-                  step={1}
-                  disabled={!isStable}
-                />
-              </div>
-              
-              <div className="bg-blue-50 rounded-lg p-4 text-sm">
-                <h3 className="font-medium mb-2">Info: {getCoolantName(coolantType)}</h3>
-                {coolantType === 'water' && (
-                  <p>Wasser hat eine hohe Wärmekapazität und ist ein guter Moderator für thermische Reaktoren. 
-                     Es kann jedoch bei zu hoher Temperatur verdampfen.</p>
-                )}
-                {coolantType === 'sodium' && (
-                  <p>Flüssiges Natrium überträgt Wärme sehr effizient und siedet erst bei 883°C. 
-                     Es reagiert jedoch heftig mit Wasser und Luft.</p>
-                )}
-                {coolantType === 'helium' && (
-                  <p>Helium ist chemisch inert und eignet sich für Hochtemperaturreaktoren. 
-                     Es hat jedoch eine geringere Wärmekapazität als Flüssigkeiten.</p>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="control" className="space-y-4">
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span>Steuerstäbe (Eintauchtiefe)</span>
-                  <span>{controlRodLevel}%</span>
-                </div>
-                <Slider
-                  value={[controlRodLevel]}
-                  onValueChange={values => setControlRodLevel(values[0])}
-                  max={100}
-                  step={1}
-                  disabled={!isStable}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Höherer Wert = mehr Kontrolle, weniger Reaktionen
-                </p>
-              </div>
-              
-              <div className="bg-blue-50 rounded-lg p-4 text-sm">
-                <h3 className="font-medium mb-2">Kontrollinformationen</h3>
-                <p>Steuerstäbe absorbieren Neutronen und verlangsamen so die Kettenreaktion. 
-                   Tiefer eingetauchte Stäbe (höherer Wert) reduzieren die Reaktionsrate und Wärmeerzeugung.</p>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-        
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center">
-                  <Thermometer className="h-5 w-5 mr-2 text-red-500" />
-                  <span className="font-medium">Temperatur</span>
-                </div>
-                <span className={cn(
-                  "font-bold",
-                  temperature > MELTDOWN_TEMPERATURE * 0.9 ? "text-red-500" : 
-                  temperature > MELTDOWN_TEMPERATURE * 0.7 ? "text-orange-500" : "text-gray-700"
-                )}>
-                  {getTemperatureDisplay()}
-                </span>
-              </div>
-              <Progress value={(temperature / MAX_TEMPERATURE) * 100} className={getWarningColor()} />
-              {warningLevel === 'high' && (
-                <div className="flex items-center mt-2 text-red-500 text-sm">
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                  <span>Kritisch! Kühlung erhöhen!</span>
-                </div>
-              )}
-            </div>
-            
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center">
-                  <Zap className="h-5 w-5 mr-2 text-yellow-500" />
-                  <span className="font-medium">Energieausbeute</span>
-                </div>
-                <span className="font-bold text-gray-700">{energyOutput.toFixed(1)} MW</span>
-              </div>
-              <Progress value={efficiency} className="bg-gray-200" />
-              <div className="flex justify-between mt-2 text-sm text-gray-500">
-                <span>Wirkungsgrad: {efficiency.toFixed(1)}%</span>
-              </div>
             </div>
           </div>
           
-          <div className="flex space-x-4">
-            {isStable ? (
-              <>
-                <Button 
-                  className="flex-1" 
-                  onClick={handleStartReactor}
-                  disabled={isRunning}
-                >
-                  Reaktor starten
-                </Button>
-                <Button 
-                  className="flex-1" 
-                  variant="outline" 
-                  onClick={handleStopReactor}
-                  disabled={!isRunning}
-                >
-                  Reaktor stoppen
-                </Button>
-              </>
-            ) : (
-              <Button 
-                className="flex-1 bg-red-500 hover:bg-red-600" 
-                onClick={handleResetReactor}
-              >
-                Reaktor wieder aufbauen
-              </Button>
-            )}
+          <div>
+            <Tabs defaultValue="reactor-type" className="w-full">
+              <TabsList className="grid grid-cols-3 mb-4">
+                <TabsTrigger value="reactor-type">Reaktortyp</TabsTrigger>
+                <TabsTrigger value="cooling">Kühlsystem</TabsTrigger>
+                <TabsTrigger value="control">Steuerung</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="reactor-type" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button 
+                    className={cn(
+                      "h-24 flex-col items-center justify-center space-y-2 text-left",
+                      reactorType === 'pressurized-water' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => {
+                      setReactorType('pressurized-water');
+                      setCoolantType('water');
+                    }}
+                    disabled={isRunning}
+                  >
+                    <div className="flex items-center">
+                      <Droplets className="h-5 w-5 mr-2 text-blue-500" />
+                      <span className="font-bold">Druckwasserreaktor</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Sicher & zuverlässig, niedrige Effizienz</p>
+                  </Button>
+                  
+                  <Button 
+                    className={cn(
+                      "h-24 flex-col items-center justify-center space-y-2 text-left",
+                      reactorType === 'fast-breeder' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => {
+                      setReactorType('fast-breeder');
+                      setCoolantType('sodium');
+                    }}
+                    disabled={isRunning}
+                  >
+                    <div className="flex items-center">
+                      <Atom className="h-5 w-5 mr-2 text-purple-500" />
+                      <span className="font-bold">Schneller Brüter</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Erzeugt Plutonium, höhere Effizienz</p>
+                  </Button>
+                  
+                  <Button 
+                    className={cn(
+                      "h-24 flex-col items-center justify-center space-y-2 text-left",
+                      reactorType === 'fusion' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => {
+                      setReactorType('fusion');
+                      setCoolantType('helium');
+                    }}
+                    disabled={isRunning}
+                  >
+                    <div className="flex items-center">
+                      <Zap className="h-5 w-5 mr-2 text-yellow-500" />
+                      <span className="font-bold">Fusionsreaktor</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Sehr hohe Effizienz, schwer zu starten</p>
+                  </Button>
+                </div>
+                
+                <div className="bg-blue-50 rounded-lg p-4 text-sm">
+                  <h3 className="font-medium mb-2">Info: {getReactorName(reactorType)}</h3>
+                  {reactorType === 'pressurized-water' && (
+                    <p>Verwendet Wasser unter hohem Druck als Kühlmittel und Moderator. 
+                      Ein sicherer Reaktortyp, der in den meisten Kernkraftwerken verwendet wird.</p>
+                  )}
+                  {reactorType === 'fast-breeder' && (
+                    <p>Nutzt schnelle Neutronen und flüssiges Natrium als Kühlmittel. Kann neuen Brennstoff (Plutonium) 
+                      erzeugen, während er Energie produziert.</p>
+                  )}
+                  {reactorType === 'fusion' && (
+                    <p>Verschmilzt Wasserstoffisotope zu Helium, ähnlich wie in der Sonne. 
+                      Benötigt extrem hohe Temperaturen und starke Magnetfelder, produziert aber viel Energie.</p>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="cooling" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button 
+                    className={cn(
+                      "h-24 flex-col items-center justify-center space-y-2 text-left",
+                      coolantType === 'water' ? "border-4 border-primary" : "border",
+                      reactorType === 'fusion' ? "opacity-50" : ""
+                    )}
+                    variant="outline"
+                    onClick={() => reactorType !== 'fusion' && setCoolantType('water')}
+                    disabled={reactorType === 'fusion' || isRunning}
+                  >
+                    <div className="flex items-center">
+                      <Droplets className="h-5 w-5 mr-2 text-blue-500" />
+                      <span className="font-bold">Wasser</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Gute Kühlung, sicher</p>
+                  </Button>
+                  
+                  <Button 
+                    className={cn(
+                      "h-24 flex-col items-center justify-center space-y-2 text-left",
+                      coolantType === 'sodium' ? "border-4 border-primary" : "border",
+                      reactorType === 'fusion' ? "opacity-50" : ""
+                    )}
+                    variant="outline"
+                    onClick={() => reactorType !== 'fusion' && setCoolantType('sodium')}
+                    disabled={reactorType === 'fusion' || isRunning}
+                  >
+                    <div className="flex items-center">
+                      <Thermometer className="h-5 w-5 mr-2 text-orange-500" />
+                      <span className="font-bold">Flüssiges Natrium</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Sehr effiziente Kühlung, reagiert mit Wasser</p>
+                  </Button>
+                  
+                  <Button 
+                    className={cn(
+                      "h-24 flex-col items-center justify-center space-y-2 text-left",
+                      coolantType === 'helium' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => setCoolantType('helium')}
+                    disabled={isRunning}
+                  >
+                    <div className="flex items-center">
+                      <Fan className="h-5 w-5 mr-2 text-purple-500" />
+                      <span className="font-bold">Helium-Gas</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Für Hochtemperatur-Reaktoren, weniger effizient</p>
+                  </Button>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span>Kühlmittelfluss</span>
+                      <span>{coolantFlow}%</span>
+                    </div>
+                    <Slider
+                      value={[coolantFlow]}
+                      onValueChange={values => setCoolantFlow(values[0])}
+                      max={100}
+                      step={1}
+                      disabled={!isStable || !isRunning}
+                    />
+                  </div>
+                  
+                  <div className="bg-blue-50 rounded-lg p-4 text-sm">
+                    <h3 className="font-medium mb-2">Info: {getCoolantName(coolantType)}</h3>
+                    {coolantType === 'water' && (
+                      <p>Wasser hat eine hohe Wärmekapazität und ist ein guter Moderator für thermische Reaktoren. 
+                        Es kann jedoch bei zu hoher Temperatur verdampfen.</p>
+                    )}
+                    {coolantType === 'sodium' && (
+                      <p>Flüssiges Natrium überträgt Wärme sehr effizient und siedet erst bei 883°C. 
+                        Es reagiert jedoch heftig mit Wasser und Luft.</p>
+                    )}
+                    {coolantType === 'helium' && (
+                      <p>Helium ist chemisch inert und eignet sich für Hochtemperaturreaktoren. 
+                        Es hat jedoch eine geringere Wärmekapazität als Flüssigkeiten.</p>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="control" className="space-y-4">
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span>Steuerstäbe (Eintauchtiefe)</span>
+                      <span>{controlRodLevel}%</span>
+                    </div>
+                    <Slider
+                      value={[controlRodLevel]}
+                      onValueChange={values => setControlRodLevel(values[0])}
+                      max={100}
+                      step={1}
+                      disabled={!isStable || !isRunning}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Höherer Wert = mehr Kontrolle, weniger Reaktionen
+                    </p>
+                  </div>
+                  
+                  <div className="bg-blue-50 rounded-lg p-4 text-sm">
+                    <h3 className="font-medium mb-2">Kontrollinformationen</h3>
+                    <p>Steuerstäbe absorbieren Neutronen und verlangsamen so die Kettenreaktion. 
+                      Tiefer eingetauchte Stäbe (höherer Wert) reduzieren die Reaktionsrate und Wärmeerzeugung.</p>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
