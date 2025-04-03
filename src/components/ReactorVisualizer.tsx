@@ -140,13 +140,12 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
                           
       const numParticles = coolantFlow / 5; // 0-20 particles based on flow
       
+      // Define inlet and outlet Y positions
+      const inletY = reactorVesselY + reactorVesselHeight * 0.8;
+      const outletY = reactorVesselY + reactorVesselHeight * 0.2;
+      
       for (let i = 0; i < numParticles; i++) {
         const baseX = reactorVesselX - 10;
-        // Inlet pipe - bottom left
-        const inletY = reactorVesselY + reactorVesselHeight * 0.8;
-        
-        // Outlet pipe - top left
-        const outletY = reactorVesselY + reactorVesselHeight * 0.2;
         
         // Particles in inlet pipe
         const inletParticleX = baseX + ((frameCount * 2 + i * 20) % 100);
