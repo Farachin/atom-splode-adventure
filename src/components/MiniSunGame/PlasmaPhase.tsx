@@ -34,6 +34,10 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
   const [lastLaser, setLastLaser] = useState(0);
   const [magnetActive, setMagnetActive] = useState(false);
   const [autoHeaterActive, setAutoHeaterActive] = useState(false);
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [mouseDownPosition, setMouseDownPosition] = useState<{x: number, y: number} | null>(null);
+  const [heatingIntensity, setHeatingIntensity] = useState(0);
+  const heatingIntervalRef = useRef<number | null>(null);
   const nextIdRef = useRef(1);
   const autoHeaterRef = useRef<number | null>(null);
   
@@ -116,6 +120,46 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     return () => clearInterval(interval);
   }, [temperature, magnetActive]);
 
+  // Hold-to-heat functionality
+  useEffect(() => {
+    if (isMouseDown && mouseDownPosition) {
+      // Start a heating interval when mouse is held down
+      if (!heatingIntervalRef.current) {
+        heatingIntervalRef.current = window.setInterval(() => {
+          // Increase heating intensity the longer mouse is held
+          setHeatingIntensity(prev => Math.min(prev + 0.5, 10));
+          
+          // Create heat effect at mouse position
+          setEffects(prev => [...prev, {
+            id: Date.now(),
+            x: mouseDownPosition.x,
+            y: mouseDownPosition.y,
+            type: 'heat'
+          }]);
+          
+          // Increase temperature based on heating intensity
+          // The longer the mouse is held, the more heat is generated per interval
+          const heatIncrement = 500000 * (1 + heatingIntensity);
+          onTemperatureChange(temperature + heatIncrement);
+        }, 100);
+      }
+    } else {
+      // Clear heating interval when mouse is released
+      if (heatingIntervalRef.current) {
+        clearInterval(heatingIntervalRef.current);
+        heatingIntervalRef.current = null;
+        setHeatingIntensity(0);
+      }
+    }
+    
+    return () => {
+      if (heatingIntervalRef.current) {
+        clearInterval(heatingIntervalRef.current);
+        heatingIntervalRef.current = null;
+      }
+    };
+  }, [isMouseDown, mouseDownPosition, temperature, onTemperatureChange, heatingIntensity]);
+
   // Auto heater effect
   useEffect(() => {
     if (autoHeaterActive && !autoHeaterRef.current) {
@@ -151,13 +195,17 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     };
   }, [autoHeaterActive, temperature, onTemperatureChange]);
 
-  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
     
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    setIsMouseDown(true);
+    setMouseDownPosition({ x, y });
+    
+    // Initial effect on mouse down
     setEffects(prev => [...prev, {
       id: Date.now(),
       x,
@@ -165,8 +213,29 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       type: 'heat'
     }]);
     
-    // Increased heat per click from 1M to 3M
-    onTemperatureChange(temperature + 3000000);
+    // Initial temperature increase
+    onTemperatureChange(temperature + 500000);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMouseDown || !containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Update mouse position for heating effects
+    setMouseDownPosition({ x, y });
+  };
+
+  const handleMouseUp = () => {
+    setIsMouseDown(false);
+    setMouseDownPosition(null);
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseDown(false);
+    setMouseDownPosition(null);
   };
 
   const handleFireLaser = () => {
@@ -219,7 +288,10 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     <div 
       className={cn("relative w-full h-full cursor-pointer", className)}
       ref={containerRef}
-      onClick={handleContainerClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
     >
       {magnetActive && (
         <div className="absolute inset-0 border-8 border-blue-500 opacity-20 rounded-full" 
@@ -235,8 +307,23 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       )}
       
       <div className="absolute top-4 left-0 right-0 text-center bg-black bg-opacity-50 text-white py-1 px-2 mx-auto w-max rounded-full text-sm">
-        Klicke zum Erhitzen! Oder nutze Auto-Erhitzer unten.
+        Halte gedrückt zum Erhitzen! Oder nutze Auto-Erhitzer unten.
       </div>
+      
+      {isMouseDown && heatingIntensity > 0 && (
+        <div 
+          className="absolute rounded-full bg-yellow-500 animate-pulse z-10"
+          style={{
+            left: mouseDownPosition?.x ? mouseDownPosition.x - 15 - (heatingIntensity * 3) : 0,
+            top: mouseDownPosition?.y ? mouseDownPosition.y - 15 - (heatingIntensity * 3) : 0,
+            width: 30 + (heatingIntensity * 6),
+            height: 30 + (heatingIntensity * 6),
+            opacity: 0.7,
+            boxShadow: `0 0 ${10 + heatingIntensity * 5}px rgba(255, 200, 0, 0.8)`,
+            transition: 'width 0.2s, height 0.2s, left 0.2s, top 0.2s'
+          }}
+        />
+      )}
       
       {particles.map(particle => (
         <div
