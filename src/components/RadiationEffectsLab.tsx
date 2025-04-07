@@ -106,7 +106,7 @@ const materialProperties: Record<MaterialType, MaterialProperties> = {
 const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) => {
   const [activeTab, setActiveTab] = useState('dna');
   const [selectedRadiation, setSelectedRadiation] = useState<RadiationType>('alpha');
-  const [radiationDose, setRadiationDose] = useState(50);
+  const [radiationDose, setRadiationDose] = useState(20);
   const [isRadiating, setIsRadiating] = useState(false);
   const [cumDose, setCumDose] = useState(0);
   const [damageLevel, setDamageLevel] = useState(0);
@@ -162,8 +162,10 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       
       animationRef.current = requestAnimationFrame(() => {
         setTimeout(() => {
-          setIsRadiating(true);
-        }, 200);
+          if (isRadiating) {
+            setIsRadiating(true);
+          }
+        }, 500);
       });
     } else if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
@@ -209,7 +211,7 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
   };
   
   const drawRadiationParticles = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    const particleCount = Math.ceil(radiationDose / 10);
+    const particleCount = Math.ceil(radiationDose / 15);
     const centerX = width / 2;
     const centerY = height / 2;
     const maxDistance = Math.min(width, height) * 0.4;
@@ -228,43 +230,43 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       const properties = radiationProperties[selectedRadiation];
       
       const now = Date.now();
-      const seed = i * 1000 + now / 150;
-      const progress = (Math.sin(seed / 1000) + 1) / 4;
+      const seed = i * 1000 + now / 300;
+      const progress = (Math.sin(seed / 1500) + 1) / 4;
       
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(targetX, targetY);
       ctx.strokeStyle = `rgba(${hexToRgb(properties.color)}, 0.4)`;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.stroke();
       
       const particleX = startX + (targetX - startX) * progress;
       const particleY = startY + (targetY - startY) * progress;
       
       ctx.beginPath();
-      ctx.arc(particleX, particleY, 5, 0, Math.PI * 2);
+      ctx.arc(particleX, particleY, 8, 0, Math.PI * 2);
       ctx.fillStyle = properties.color;
       ctx.fill();
       
       const glow = ctx.createRadialGradient(
         particleX, particleY, 0,
-        particleX, particleY, 12
+        particleX, particleY, 16
       );
       glow.addColorStop(0, properties.color);
       glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
       
       ctx.beginPath();
-      ctx.arc(particleX, particleY, 12, 0, Math.PI * 2);
+      ctx.arc(particleX, particleY, 16, 0, Math.PI * 2);
       ctx.fillStyle = glow;
       ctx.fill();
       
-      ctx.font = "bold 14px Arial";
+      ctx.font = "bold 16px Arial";
       ctx.fillStyle = 'white';
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       
       ctx.beginPath();
-      ctx.arc(particleX, particleY, 10, 0, Math.PI * 2);
+      ctx.arc(particleX, particleY, 12, 0, Math.PI * 2);
       ctx.fillStyle = properties.color;
       ctx.fill();
       
@@ -272,9 +274,9 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       ctx.fillText(properties.symbol, particleX, particleY);
       
       if (progress > 0.05) {
-        const trailLength = 3;
+        const trailLength = 4;
         for (let t = 1; t <= trailLength; t++) {
-          const trailProgress = Math.max(0, progress - (t * 0.05));
+          const trailProgress = Math.max(0, progress - (t * 0.03));
           const trailX = startX + (targetX - startX) * trailProgress;
           const trailY = startY + (targetY - startY) * trailProgress;
           
@@ -282,11 +284,11 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
           ctx.arc(
             trailX,
             trailY,
-            5 - t,
+            6 - t,
             0,
             Math.PI * 2
           );
-          ctx.fillStyle = `rgba(${hexToRgb(properties.color)}, ${0.3 - (t * 0.08)})`;
+          ctx.fillStyle = `rgba(${hexToRgb(properties.color)}, ${0.4 - (t * 0.08)})`;
           ctx.fill();
         }
       }

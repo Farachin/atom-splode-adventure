@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -35,7 +34,6 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
   const [magnetActive, setMagnetActive] = useState(false);
   const nextIdRef = useRef(1);
   
-  // Initialize particles
   useEffect(() => {
     if (!containerRef.current) return;
     
@@ -57,7 +55,6 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     setParticles(newParticles);
   }, []);
 
-  // Update particles
   useEffect(() => {
     if (!containerRef.current) return;
     
@@ -66,11 +63,9 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     const interval = setInterval(() => {
       setParticles(prevParticles => {
         return prevParticles.map(particle => {
-          // Update position
           let newX = particle.x + Math.cos(particle.angle) * particle.speed * 0.02;
           let newY = particle.y + Math.sin(particle.angle) * particle.speed * 0.02;
           
-          // Bounce off walls
           if (newX < 0 || newX > width) {
             particle.angle = Math.PI - particle.angle;
             newX = Math.max(0, Math.min(width, newX));
@@ -80,18 +75,14 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
             newY = Math.max(0, Math.min(height, newY));
           }
           
-          // Random angle changes for natural movement
           if (Math.random() < 0.05) {
             particle.angle += (Math.random() - 0.5) * 0.5;
           }
           
-          // Particles move faster as temperature increases
           const speedFactor = 1 + (temperature / 10000000);
           let newSpeed = particle.speed * speedFactor;
           
-          // Magnetic confinement effect
           if (magnetActive && temperature > 100000) {
-            // Pull particles toward center when magnet is active
             const centerX = width / 2;
             const centerY = height / 2;
             const dx = centerX - newX;
@@ -109,22 +100,19 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
             y: newY,
             speed: newSpeed,
             angle: particle.angle,
-            // Size and energy increase with temperature
             size: 3 + (temperature / 10000000) * 5,
             energy: Math.min(100, particle.energy + (temperature / 50000000))
           };
         });
       });
       
-      // Remove old effects
       setEffects(prev => prev.filter(effect => Date.now() - effect.id < 500));
       
-    }, 16); // 60fps
+    }, 16);
     
     return () => clearInterval(interval);
   }, [temperature, magnetActive]);
 
-  // Handle container click - add heat effect
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
     
@@ -132,7 +120,6 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // Add heat effect
     setEffects(prev => [...prev, {
       id: Date.now(),
       x,
@@ -140,21 +127,17 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       type: 'heat'
     }]);
     
-    // Increase temperature
-    onTemperatureChange(temperature + 500000);
+    onTemperatureChange(temperature + 1000000);
   };
-  
-  // Fire laser
+
   const handleFireLaser = () => {
     if (!containerRef.current || Date.now() - lastLaser < 300) return;
     
     const { width, height } = containerRef.current.getBoundingClientRect();
     
-    // Random position for laser
     const x = Math.random() * width;
     const y = Math.random() * height;
     
-    // Add laser effect
     setEffects(prev => [...prev, {
       id: Date.now(),
       x,
@@ -162,22 +145,18 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       type: 'laser'
     }]);
     
-    // Increase temperature significantly
-    onTemperatureChange(temperature + 2000000);
+    onTemperatureChange(temperature + 3000000);
     setLastLaser(Date.now());
   };
-  
-  // Toggle magnetic confinement
+
   const handleToggleMagnet = () => {
     setMagnetActive(!magnetActive);
     
-    // Magnetic confinement helps control the particles and increases temperature slightly
     if (!magnetActive) {
       onTemperatureChange(temperature + 500000);
     }
   };
 
-  // Get color based on temperature
   const getParticleColor = (energy: number, temp: number) => {
     if (temp >= 100000000) {
       return `rgba(255, 255, 255, ${Math.min(1, energy / 100)})`;
@@ -194,11 +173,10 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
 
   return (
     <div 
-      className={cn("relative w-full h-full", className)}
+      className={cn("relative w-full h-full cursor-pointer", className)}
       ref={containerRef}
       onClick={handleContainerClick}
     >
-      {/* Magnetic field visualization */}
       {magnetActive && (
         <div className="absolute inset-0 border-8 border-blue-500 opacity-20 rounded-full" 
              style={{ 
@@ -212,7 +190,10 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
         />
       )}
       
-      {/* Particle visualization */}
+      <div className="absolute top-4 left-0 right-0 text-center bg-black bg-opacity-50 text-white py-1 px-2 mx-auto w-max rounded-full text-sm">
+        Klicke zum Erhitzen!
+      </div>
+      
       {particles.map(particle => (
         <div
           key={particle.id}
@@ -232,7 +213,6 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
         />
       ))}
       
-      {/* Effects (laser, heating) */}
       {effects.map(effect => (
         effect.type === 'laser' ? (
           <Effect
@@ -247,17 +227,16 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
             key={effect.id}
             className="absolute rounded-full bg-orange-500 animate-pulse-grow z-10"
             style={{
-              left: effect.x - 10,
-              top: effect.y - 10,
-              width: 20,
-              height: 20,
-              opacity: 0.7
+              left: effect.x - 15,
+              top: effect.y - 15,
+              width: 30,
+              height: 30,
+              opacity: 0.8
             }}
           />
         )
       ))}
       
-      {/* Controls */}
       <div className="absolute bottom-4 left-4 right-4 flex space-x-2 z-30">
         <Button 
           onClick={handleFireLaser}
