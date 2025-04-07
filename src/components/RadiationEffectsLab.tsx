@@ -115,6 +115,20 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   
+  const startRadiation = () => {
+    setIsRadiating(true);
+  };
+  
+  const stopRadiation = () => {
+    setIsRadiating(false);
+  };
+  
+  const resetExperiment = () => {
+    setCumDose(0);
+    setDamageLevel(0);
+    setShowEffects(false);
+  };
+  
   useEffect(() => {
     setCumDose(0);
     setDamageLevel(0);
