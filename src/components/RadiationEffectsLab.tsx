@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -106,7 +107,7 @@ const materialProperties: Record<MaterialType, MaterialProperties> = {
 const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) => {
   const [activeTab, setActiveTab] = useState('dna');
   const [selectedRadiation, setSelectedRadiation] = useState<RadiationType>('alpha');
-  const [radiationDose, setRadiationDose] = useState(20);
+  const [radiationDose, setRadiationDose] = useState(15); // Reduced from 20 to 15 for slower radiation
   const [isRadiating, setIsRadiating] = useState(false);
   const [cumDose, setCumDose] = useState(0);
   const [damageLevel, setDamageLevel] = useState(0);
@@ -114,6 +115,7 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
+  const radiationIntervalRef = useRef<number | null>(null);
   
   const startRadiation = () => {
     setIsRadiating(true);
@@ -121,9 +123,18 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
   
   const stopRadiation = () => {
     setIsRadiating(false);
+    if (radiationIntervalRef.current) {
+      clearInterval(radiationIntervalRef.current);
+      radiationIntervalRef.current = null;
+    }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
   };
   
   const resetExperiment = () => {
+    stopRadiation(); // Make sure to stop any ongoing radiation
     setCumDose(0);
     setDamageLevel(0);
     setShowEffects(false);
@@ -143,40 +154,54 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
     const material = activeTab as MaterialType;
     
     if (isRadiating) {
-      const penetration = radiationProperties[selectedRadiation].penetration;
-      const materialResistance = materialProperties[material].resistance;
-      
-      const effectiveDose = (radiationDose * penetration * (100 - materialResistance)) / 10000;
-      
-      const newCumDose = cumDose + effectiveDose;
-      setCumDose(newCumDose);
-      
-      const newDamage = Math.min(100, Math.pow(newCumDose / 10, 1.5));
-      setDamageLevel(newDamage);
-      
-      if (newDamage > 20 && !showEffects) {
-        setShowEffects(true);
+      // Clear any existing interval before creating a new one
+      if (radiationIntervalRef.current) {
+        clearInterval(radiationIntervalRef.current);
       }
       
-      drawVisualization();
-      
-      animationRef.current = requestAnimationFrame(() => {
-        setTimeout(() => {
-          if (isRadiating) {
-            setIsRadiating(true);
+      // Use an interval to add radiation at a set rate
+      radiationIntervalRef.current = window.setInterval(() => {
+        const penetration = radiationProperties[selectedRadiation].penetration;
+        const materialResistance = materialProperties[material].resistance;
+        
+        const effectiveDose = (radiationDose * penetration * (100 - materialResistance)) / 10000;
+        
+        setCumDose(prevDose => {
+          const newCumDose = prevDose + effectiveDose;
+          const newDamage = Math.min(100, Math.pow(newCumDose / 10, 1.5));
+          setDamageLevel(newDamage);
+          
+          if (newDamage > 20 && !showEffects) {
+            setShowEffects(true);
           }
-        }, 500);
-      });
-    } else if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
+          
+          return newCumDose;
+        });
+        
+      }, 1000); // Slowed down from 500ms to 1000ms
+      
+      // Make sure we have animation frame for visual effects
+      const animate = () => {
+        drawVisualization();
+        if (isRadiating) {
+          animationRef.current = requestAnimationFrame(animate);
+        }
+      };
+      animate();
     }
     
+    // Cleanup function
     return () => {
+      if (radiationIntervalRef.current) {
+        clearInterval(radiationIntervalRef.current);
+        radiationIntervalRef.current = null;
+      }
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
       }
     };
-  }, [isRadiating, selectedRadiation, radiationDose, cumDose, activeTab, showEffects]);
+  }, [isRadiating, selectedRadiation, radiationDose, activeTab, showEffects]);
   
   const drawVisualization = () => {
     const canvas = canvasRef.current;
@@ -211,7 +236,8 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
   };
   
   const drawRadiationParticles = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    const particleCount = Math.ceil(radiationDose / 15);
+    // Reduced particle count for slower visual effect
+    const particleCount = Math.ceil(radiationDose / 20); 
     const centerX = width / 2;
     const centerY = height / 2;
     const maxDistance = Math.min(width, height) * 0.4;
@@ -230,7 +256,8 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       const properties = radiationProperties[selectedRadiation];
       
       const now = Date.now();
-      const seed = i * 1000 + now / 300;
+      // Slowed down the animation by changing divisor from 300 to 700
+      const seed = i * 1000 + now / 700; 
       const progress = (Math.sin(seed / 1500) + 1) / 4;
       
       ctx.beginPath();
@@ -243,20 +270,21 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       const particleX = startX + (targetX - startX) * progress;
       const particleY = startY + (targetY - startY) * progress;
       
+      // Increased particle size for better visibility
       ctx.beginPath();
-      ctx.arc(particleX, particleY, 8, 0, Math.PI * 2);
+      ctx.arc(particleX, particleY, 10, 0, Math.PI * 2);
       ctx.fillStyle = properties.color;
       ctx.fill();
       
       const glow = ctx.createRadialGradient(
         particleX, particleY, 0,
-        particleX, particleY, 16
+        particleX, particleY, 20
       );
       glow.addColorStop(0, properties.color);
       glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
       
       ctx.beginPath();
-      ctx.arc(particleX, particleY, 16, 0, Math.PI * 2);
+      ctx.arc(particleX, particleY, 20, 0, Math.PI * 2);
       ctx.fillStyle = glow;
       ctx.fill();
       
@@ -274,9 +302,9 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
       ctx.fillText(properties.symbol, particleX, particleY);
       
       if (progress > 0.05) {
-        const trailLength = 4;
+        const trailLength = 5; // Increased from 4 to 5
         for (let t = 1; t <= trailLength; t++) {
-          const trailProgress = Math.max(0, progress - (t * 0.03));
+          const trailProgress = Math.max(0, progress - (t * 0.02)); // Slower trail (from 0.03 to 0.02)
           const trailX = startX + (targetX - startX) * trailProgress;
           const trailY = startY + (targetY - startY) * trailProgress;
           
@@ -284,11 +312,11 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
           ctx.arc(
             trailX,
             trailY,
-            6 - t,
+            8 - t, // Larger trail particles
             0,
             Math.PI * 2
           );
-          ctx.fillStyle = `rgba(${hexToRgb(properties.color)}, ${0.4 - (t * 0.08)})`;
+          ctx.fillStyle = `rgba(${hexToRgb(properties.color)}, ${0.5 - (t * 0.08)})`; // More visible trail
           ctx.fill();
         }
       }
@@ -740,8 +768,8 @@ const RadiationEffectsLab: React.FC<RadiationEffectsLabProps> = ({ className }) 
                 </div>
                 <Slider 
                   value={[radiationDose]}
-                  min={10}
-                  max={100}
+                  min={5}
+                  max={30}
                   step={1}
                   onValueChange={(values) => setRadiationDose(values[0])}
                   disabled={isRadiating}
