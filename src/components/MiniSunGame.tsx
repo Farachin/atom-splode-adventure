@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,8 +25,8 @@ type StarType = 'none' | 'red-dwarf' | 'main-sequence' | 'blue-giant' | 'neutron
 
 // Constants for game physics - lower thresholds for easier gameplay
 const MIN_TEMPERATURE = 20; // Room temperature in C
-const PLASMA_THRESHOLD = 8000000; // Lowered from 10 million to 8 million C
-const FUSION_THRESHOLD = 120000000; // Lowered from 150 million to 120 million C
+const PLASMA_THRESHOLD = 5000000; // Lowered from 8 million to 5 million C
+const FUSION_THRESHOLD = 100000000; // Lowered from 120 million to 100 million C
 const MAX_TEMPERATURE = 500000000; // 500 million C
 
 const MIN_STABILITY = 0;
@@ -99,12 +100,12 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
 
       // Update game state based on current phase
       if (phase === 'plasma') {
-        // Temperature slowly drops unless being heated - reduced cooling rate
-        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (3000000 * deltaTime))); // Reduced from 5M to 3M
+        // Temperature slowly drops unless being heated - significantly reduced cooling rate
+        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (800000 * deltaTime))); // Reduced from 3M to 800k
       } else if (phase === 'stabilize') {
         // Temperature drops faster, stability decreases - reduced cooling rate
-        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (8000000 * deltaTime))); // Reduced from 10M to 8M
-        setStability(prev => Math.max(0, prev - (8 * deltaTime))); // Reduced from 10 to 8
+        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (2000000 * deltaTime))); // Reduced from 8M to 2M
+        setStability(prev => Math.max(0, prev - (5 * deltaTime))); // Reduced from 8 to 5
         
         // If temperature drops below plasma threshold, go back to plasma phase
         if (temperature < PLASMA_THRESHOLD) {
@@ -117,9 +118,9 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         }
       } else if (phase === 'fusion') {
         // Temperature and stability drop, pressure drops - reduced rates
-        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (8000000 * deltaTime))); // Reduced from 10M to 8M
-        setStability(prev => Math.max(0, prev - (12 * deltaTime))); // Reduced from 15 to 12
-        setPressure(prev => Math.max(0, prev - (15 * deltaTime))); // Reduced from 20 to 15
+        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (3000000 * deltaTime))); // Reduced from 8M to 3M
+        setStability(prev => Math.max(0, prev - (8 * deltaTime))); // Reduced from 12 to 8
+        setPressure(prev => Math.max(0, prev - (10 * deltaTime))); // Reduced from 15 to 10
         
         // If stability or temperature gets too low, go back to appropriate phase
         if (stability < 30) {
