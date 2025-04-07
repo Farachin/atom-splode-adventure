@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -32,7 +33,9 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
   }>>([]);
   const [lastLaser, setLastLaser] = useState(0);
   const [magnetActive, setMagnetActive] = useState(false);
+  const [autoHeaterActive, setAutoHeaterActive] = useState(false);
   const nextIdRef = useRef(1);
+  const autoHeaterRef = useRef<number | null>(null);
   
   useEffect(() => {
     if (!containerRef.current) return;
@@ -113,6 +116,41 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     return () => clearInterval(interval);
   }, [temperature, magnetActive]);
 
+  // Auto heater effect
+  useEffect(() => {
+    if (autoHeaterActive && !autoHeaterRef.current) {
+      autoHeaterRef.current = window.setInterval(() => {
+        if (!containerRef.current) return;
+        
+        const { width, height } = containerRef.current.getBoundingClientRect();
+        
+        // Add random heat effect
+        setEffects(prev => {
+          const newEffects = [...prev];
+          for (let i = 0; i < 2; i++) {
+            newEffects.push({
+              id: Date.now() + i,
+              x: Math.random() * width,
+              y: Math.random() * height,
+              type: 'heat'
+            });
+          }
+          return newEffects;
+        });
+        
+        // Increase temperature
+        onTemperatureChange(temperature + 2000000);
+      }, 500);
+    }
+    
+    return () => {
+      if (autoHeaterRef.current) {
+        clearInterval(autoHeaterRef.current);
+        autoHeaterRef.current = null;
+      }
+    };
+  }, [autoHeaterActive, temperature, onTemperatureChange]);
+
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
     
@@ -127,7 +165,8 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       type: 'heat'
     }]);
     
-    onTemperatureChange(temperature + 1000000);
+    // Increased heat per click from 1M to 3M
+    onTemperatureChange(temperature + 3000000);
   };
 
   const handleFireLaser = () => {
@@ -145,7 +184,8 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       type: 'laser'
     }]);
     
-    onTemperatureChange(temperature + 3000000);
+    // Increased laser heat from 3M to 5M
+    onTemperatureChange(temperature + 5000000);
     setLastLaser(Date.now());
   };
 
@@ -155,6 +195,10 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     if (!magnetActive) {
       onTemperatureChange(temperature + 500000);
     }
+  };
+  
+  const handleToggleAutoHeater = () => {
+    setAutoHeaterActive(!autoHeaterActive);
   };
 
   const getParticleColor = (energy: number, temp: number) => {
@@ -191,7 +235,7 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       )}
       
       <div className="absolute top-4 left-0 right-0 text-center bg-black bg-opacity-50 text-white py-1 px-2 mx-auto w-max rounded-full text-sm">
-        Klicke zum Erhitzen!
+        Klicke zum Erhitzen! Oder nutze Auto-Erhitzer unten.
       </div>
       
       {particles.map(particle => (
@@ -256,6 +300,18 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
           )}
         >
           Magnetfeld {magnetActive ? 'An' : 'Aus'}
+        </Button>
+        
+        <Button 
+          onClick={handleToggleAutoHeater}
+          size="sm"
+          variant={autoHeaterActive ? "default" : "outline"} 
+          className={cn(
+            "flex-1",
+            autoHeaterActive ? "bg-red-500 hover:bg-red-600" : ""
+          )}
+        >
+          Auto-Erhitzer {autoHeaterActive ? 'An' : 'Aus'}
         </Button>
       </div>
     </div>
