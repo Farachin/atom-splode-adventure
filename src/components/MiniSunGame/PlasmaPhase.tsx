@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -122,25 +121,18 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     return () => clearInterval(interval);
   }, [temperature, magnetActive]);
 
-  // Hold-to-heat functionality with increasing multiplier over time
   useEffect(() => {
     if (isMouseDown && mouseDownPosition) {
-      // Start a heating interval when mouse is held down
       if (!heatingIntervalRef.current) {
         mouseHoldTimeRef.current = Date.now();
         
         heatingIntervalRef.current = window.setInterval(() => {
-          // Calculate how long the mouse has been held down
-          const holdDuration = (Date.now() - mouseHoldTimeRef.current) / 1000; // in seconds
-          
-          // Increase heat multiplier over time (caps at 20x after 5 seconds)
-          const newHeatMultiplier = Math.min(20, 1 + holdDuration * 4);
+          const holdDuration = (Date.now() - mouseHoldTimeRef.current) / 1000;
+          const newHeatMultiplier = Math.min(50, 1 + holdDuration * 10);
           setHeatMultiplier(newHeatMultiplier);
           
-          // Increase heating intensity the longer mouse is held
-          setHeatingIntensity(prev => Math.min(prev + 0.5, 10));
+          setHeatingIntensity(prev => Math.min(prev + 1, 20));
           
-          // Create heat effect at mouse position
           setEffects(prev => [...prev, {
             id: Date.now(),
             x: mouseDownPosition.x,
@@ -148,14 +140,14 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
             type: 'heat'
           }]);
           
-          // Increase temperature based on heating intensity and multiplier
-          // The longer the mouse is held, the more heat is generated per interval
-          const heatIncrement = 1500000 * (1 + heatingIntensity) * newHeatMultiplier;
+          const secondsSinceLastHeat = 0.1;
+          const baseHeatPerSecond = 1000000;
+          const heatIncrement = baseHeatPerSecond * secondsSinceLastHeat * (1 + heatingIntensity * 0.5) * newHeatMultiplier;
+          
           onTemperatureChange(temperature + heatIncrement);
         }, 100);
       }
     } else {
-      // Clear heating interval when mouse is released
       if (heatingIntervalRef.current) {
         clearInterval(heatingIntervalRef.current);
         heatingIntervalRef.current = null;
@@ -173,7 +165,6 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     };
   }, [isMouseDown, mouseDownPosition, temperature, onTemperatureChange, heatingIntensity]);
 
-  // Auto heater effect
   useEffect(() => {
     if (autoHeaterActive && !autoHeaterRef.current) {
       autoHeaterRef.current = window.setInterval(() => {
@@ -181,7 +172,6 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
         
         const { width, height } = containerRef.current.getBoundingClientRect();
         
-        // Add random heat effect
         setEffects(prev => {
           const newEffects = [...prev];
           for (let i = 0; i < 2; i++) {
@@ -195,8 +185,7 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
           return newEffects;
         });
         
-        // Significantly increase temperature
-        onTemperatureChange(temperature + 6000000);
+        onTemperatureChange(temperature + 18000000);
       }, 500);
     } else if (!autoHeaterActive && autoHeaterRef.current) {
       clearInterval(autoHeaterRef.current);
@@ -222,7 +211,6 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     setMouseDownPosition({ x, y });
     mouseHoldTimeRef.current = Date.now();
     
-    // Initial effect on mouse down
     setEffects(prev => [...prev, {
       id: Date.now(),
       x,
@@ -230,8 +218,7 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       type: 'heat'
     }]);
     
-    // Initial temperature increase
-    onTemperatureChange(temperature + 1000000);
+    onTemperatureChange(temperature + 3000000);
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -241,7 +228,6 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // Update mouse position for heating effects
     setMouseDownPosition({ x, y });
   };
 
@@ -270,8 +256,7 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       type: 'laser'
     }]);
     
-    // Increased laser heat
-    onTemperatureChange(temperature + 8000000);
+    onTemperatureChange(temperature + 16000000);
     setLastLaser(Date.now());
   };
 
@@ -324,7 +309,7 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       )}
       
       <div className="absolute top-4 left-0 right-0 text-center bg-black bg-opacity-70 text-white py-2 px-4 mx-auto w-max rounded-full text-sm z-30 shadow-lg">
-        <span className="font-medium">Tipp:</span> Halte gedrückt zum Erhitzen! Je länger gedrückt, desto mehr Hitze.
+        <span className="font-medium">Tipp:</span> Halte gedrückt zum Erhitzen! Je länger gedrückt, desto mehr Hitze (1 Mio. °C pro Sekunde).
       </div>
       
       {isMouseDown && heatingIntensity > 0 && (
@@ -342,7 +327,6 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
         />
       )}
       
-      {/* Heat multiplier indicator */}
       {isMouseDown && heatMultiplier > 1 && (
         <div 
           className="absolute bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold rounded-full text-sm px-3 py-1 shadow-lg z-20"
