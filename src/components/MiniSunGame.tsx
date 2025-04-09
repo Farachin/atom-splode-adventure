@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,8 +25,8 @@ type StarType = 'none' | 'red-dwarf' | 'main-sequence' | 'blue-giant' | 'neutron
 
 // Constants for game physics - lower thresholds for easier gameplay
 const MIN_TEMPERATURE = 20; // Room temperature in C
-const PLASMA_THRESHOLD = 5000000; // Lowered from 8 million to 5 million C
-const FUSION_THRESHOLD = 80000000; // Lowered to 80 million for easier gameplay
+const PLASMA_THRESHOLD = 3000000; // Further lowered for easier gameplay
+const FUSION_THRESHOLD = 50000000; // Lowered for easier gameplay
 const MAX_TEMPERATURE = 500000000; // 500 million C
 
 const MIN_STABILITY = 0;
@@ -51,11 +52,32 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
   const [starAge, setStarAge] = useState<number>(0);
   const [gameActive, setGameActive] = useState<boolean>(false);
   const [showTutorial, setShowTutorial] = useState<boolean>(true);
+  const [tutorialStep, setTutorialStep] = useState<number>(0);
   
   // For animation and game loop
   const gameLoopRef = useRef<number | null>(null);
   const lastTickRef = useRef<number>(Date.now());
   const { toast } = useToast();
+
+  // Tutorial steps
+  const tutorialSteps = [
+    {
+      title: "Schritt 1: Plasma erzeugen",
+      description: "Um eine Sonne zu erschaffen, musst du zuerst ein super heißes Plasma machen! Klicke und halte gedrückt, um das Gas zu erhitzen. Du brauchst mindestens 3 Millionen Grad!"
+    },
+    {
+      title: "Schritt 2: Plasma stabilisieren",
+      description: "Super! Jetzt musst du das heiße Plasma zusammenhalten. Verwende Magnetfelder, damit es nicht entweicht. Stabilität über 80% erreichen!"
+    },
+    {
+      title: "Schritt 3: Fusion starten",
+      description: "Fast geschafft! Jetzt erhöhe den Druck auf die Wasserstoffatome, damit sie zusammenstoßen und verschmelzen. Druck auf 90% erhöhen!"
+    },
+    {
+      title: "Schritt 4: Deine Mini-Sonne pflegen",
+      description: "Toll gemacht! Deine Sonne brennt jetzt. Halte sie am Leben, indem du Brennstoff hinzufügst, wenn er niedrig wird."
+    }
+  ];
 
   // Handle phase transitions
   useEffect(() => {
@@ -66,6 +88,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         variant: "default",
       });
       setPhase('stabilize');
+      setTutorialStep(1);
     } else if (phase === 'stabilize' && stability >= 80 && temperature >= FUSION_THRESHOLD) {
       toast({
         title: "Plasma ist stabil!",
@@ -73,6 +96,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         variant: "default",
       });
       setPhase('fusion');
+      setTutorialStep(2);
     } else if (phase === 'fusion' && pressure >= 90 && temperature >= FUSION_THRESHOLD) {
       // First fusion achieved
       if (starType === 'none') {
@@ -84,6 +108,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         setStarType('red-dwarf');
         unlockAchievement('first-fusion');
         setPhase('maintain');
+        setTutorialStep(3);
       }
     }
   }, [temperature, stability, pressure, phase, starType, toast]);
@@ -100,15 +125,16 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
       // Update game state based on current phase
       if (phase === 'plasma') {
         // Temperature slowly drops unless being heated - EXTREMELY reduced cooling rate
-        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (200000 * deltaTime))); // Reduced from 800k to 200k
+        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (100000 * deltaTime))); // Further reduced cooling
       } else if (phase === 'stabilize') {
         // Temperature drops faster, stability decreases - EXTREMELY reduced cooling rate
-        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (500000 * deltaTime))); // Reduced from 2M to 500k
-        setStability(prev => Math.max(0, prev - (3 * deltaTime))); // Reduced from 5 to 3
+        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (200000 * deltaTime))); // Further reduced cooling
+        setStability(prev => Math.max(0, prev - (2 * deltaTime))); // Reduced stability loss
         
         // If temperature drops below plasma threshold, go back to plasma phase
         if (temperature < PLASMA_THRESHOLD) {
           setPhase('plasma');
+          setTutorialStep(0);
           toast({
             title: "Plasma verloren!",
             description: "Die Temperatur ist zu niedrig. Erhitze das Gas wieder!",
@@ -117,13 +143,14 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         }
       } else if (phase === 'fusion') {
         // Temperature and stability drop, pressure drops - EXTREMELY reduced rates
-        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (700000 * deltaTime))); // Reduced from 3M to 700k
-        setStability(prev => Math.max(0, prev - (4 * deltaTime))); // Reduced from 8 to 4
-        setPressure(prev => Math.max(0, prev - (5 * deltaTime))); // Reduced from 10 to 5
+        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (300000 * deltaTime))); // Further reduced cooling
+        setStability(prev => Math.max(0, prev - (2 * deltaTime))); // Reduced stability loss
+        setPressure(prev => Math.max(0, prev - (3 * deltaTime))); // Reduced pressure loss
         
         // If stability or temperature gets too low, go back to appropriate phase
         if (stability < 30) {
           setPhase('stabilize');
+          setTutorialStep(1);
           toast({
             title: "Instabil!",
             description: "Das Plasma wird instabil. Stabilisiere es wieder!",
@@ -131,6 +158,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
           });
         } else if (temperature < PLASMA_THRESHOLD) {
           setPhase('plasma');
+          setTutorialStep(0);
           toast({
             title: "Plasma verloren!",
             description: "Die Temperatur ist zu niedrig. Erhitze das Gas wieder!",
@@ -170,7 +198,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-  }, [gameActive, phase, temperature, stability, pressure, fuel, starType]);
+  }, [gameActive, phase, temperature, stability, pressure, fuel, starType, onEnergyProduced]);
 
   // Helper functions
   const getStarFuelConsumption = (type: StarType): number => {
@@ -286,6 +314,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
     setStarType('none');
     setStarSize(0);
     setStarAge(0);
+    setTutorialStep(0);
   };
 
   const handleAddFuel = () => {
@@ -298,18 +327,38 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
       });
     }
   };
+  
+  // Get appropriate color for temperature display
+  const getTemperatureColor = () => {
+    if (temperature < 100000) return "text-blue-500";
+    if (temperature < 1000000) return "text-purple-500";
+    if (temperature < 10000000) return "text-orange-500";
+    return "text-red-500";
+  };
+  
+  // Format temperature for display
+  const formatTemperature = () => {
+    if (temperature < 1000) {
+      return `${temperature.toFixed(0)} °C`;
+    } else if (temperature < 1000000) {
+      return `${(temperature / 1000).toFixed(1)} Tausend °C`;
+    } else {
+      return `${(temperature / 1000000).toFixed(1)} Mio. °C`;
+    }
+  };
 
   return (
-    <Card className={cn("p-6 bg-white overflow-hidden", className)}>
+    <Card className={cn("p-6 bg-gradient-to-b from-blue-50 to-indigo-50 overflow-hidden shadow-lg", className)}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-300 to-orange-500 bg-clip-text text-transparent">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
             Bau deine eigene Mini-Sonne!
           </h2>
+          
           {starType !== 'none' ? (
             <Badge 
               variant="outline"
-              className="px-3 py-1 bg-gradient-to-r from-yellow-300 to-orange-500 text-white border-yellow-500"
+              className="px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-yellow-500"
             >
               {getStarName(starType)}
             </Badge>
@@ -321,37 +370,39 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         </div>
 
         {showTutorial ? (
-          <div className="space-y-4 text-center py-8">
-            <Sun className="w-16 h-16 mx-auto text-yellow-500" />
+          <div className="space-y-4 text-center py-8 animate-fade-in">
+            <Sun className="w-16 h-16 mx-auto text-yellow-500 animate-pulse" />
             <h3 className="text-xl font-bold">Willkommen zum Mini-Sonnen-Baukasten!</h3>
             <p className="text-gray-600 max-w-md mx-auto">
               Erschaffe deine eigene funktionierende Mini-Sonne! Du wirst durch alle Schritte geführt, 
               um eine echte Kernfusion zu erzeugen - genau wie unsere Sonne.
             </p>
+            
             <div className="grid grid-cols-2 gap-4 max-w-md mx-auto mt-4">
-              <div className="p-3 bg-blue-50 rounded-lg">
+              <div className="p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors shadow">
                 <Circle className="w-6 h-6 mx-auto text-blue-500 mb-2" />
                 <h4 className="font-medium">Plasma erzeugen</h4>
                 <p className="text-xs text-gray-500">Erhitze Wasserstoff auf Millionen Grad</p>
               </div>
-              <div className="p-3 bg-purple-50 rounded-lg">
+              <div className="p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors shadow">
                 <Zap className="w-6 h-6 mx-auto text-purple-500 mb-2" />
                 <h4 className="font-medium">Plasma stabilisieren</h4>
                 <p className="text-xs text-gray-500">Halte das Plasma mit Magnetfeldern zusammen</p>
               </div>
-              <div className="p-3 bg-orange-50 rounded-lg">
+              <div className="p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors shadow">
                 <Flame className="w-6 h-6 mx-auto text-orange-500 mb-2" />
                 <h4 className="font-medium">Fusion starten</h4>
                 <p className="text-xs text-gray-500">Presse die Atomkerne zusammen</p>
               </div>
-              <div className="p-3 bg-yellow-50 rounded-lg">
+              <div className="p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors shadow">
                 <Sun className="w-6 h-6 mx-auto text-yellow-500 mb-2" />
                 <h4 className="font-medium">Sonne pflegen</h4>
                 <p className="text-xs text-gray-500">Halte deine Mini-Sonne am Leuchten</p>
               </div>
             </div>
+            
             <Button 
-              className="mt-6 bg-gradient-to-r from-yellow-400 to-orange-500 text-white"
+              className="mt-6 bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:from-yellow-500 hover:to-orange-600 shadow-md hover:shadow-lg transform hover:scale-105 transition-all"
               size="lg"
               onClick={startGame}
             >
@@ -361,7 +412,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="relative h-64 md:h-80 rounded-lg bg-gradient-to-b from-black to-blue-900 overflow-hidden flex items-center justify-center">
+              <div className="relative h-64 md:h-80 rounded-lg bg-gradient-to-b from-black to-blue-900 overflow-hidden flex items-center justify-center shadow-md">
                 {phase === 'plasma' && (
                   <PlasmaPhase 
                     temperature={temperature} 
@@ -405,21 +456,26 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
               
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Temperatur</span>
-                      <span className="text-sm text-gray-500">
-                        {temperature < 1000 
-                          ? `${temperature.toFixed(0)} °C` 
-                          : `${(temperature / 1000000).toFixed(1)} Mio. °C`}
+                      <span className="text-sm font-medium flex items-center">
+                        <Flame className="w-4 h-4 mr-1 text-red-500" />
+                        Temperatur
+                      </span>
+                      <span className={`text-sm font-bold ${getTemperatureColor()}`}>
+                        {formatTemperature()}
                       </span>
                     </div>
                     <Progress 
                       value={(temperature / MAX_TEMPERATURE) * 100} 
                       className="h-2 bg-gray-200"
+                      style={{
+                        background: 'linear-gradient(to right, #3b82f6, #8b5cf6, #ec4899, #ef4444)',
+                        opacity: temperature > 100000 ? 1 : 0.3
+                      }}
                     />
                     {temperature >= FUSION_THRESHOLD ? (
-                      <span className="text-xs text-green-500">Fusionstemperatur erreicht!</span>
+                      <span className="text-xs text-green-500 font-semibold">Fusionstemperatur erreicht! ✓</span>
                     ) : temperature >= PLASMA_THRESHOLD ? (
                       <span className="text-xs text-blue-500">Plasma erzeugt</span>
                     ) : (
@@ -427,17 +483,24 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                     )}
                   </div>
                   
-                  <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Stabilität</span>
-                      <span className="text-sm text-gray-500">{stability.toFixed(0)}%</span>
+                      <span className="text-sm font-medium flex items-center">
+                        <Zap className="w-4 h-4 mr-1 text-purple-500" />
+                        Stabilität
+                      </span>
+                      <span className="text-sm font-bold">{stability.toFixed(0)}%</span>
                     </div>
                     <Progress 
                       value={stability} 
                       className="h-2 bg-gray-200"
+                      style={{
+                        background: stability >= 80 ? '#10b981' : 
+                                    stability >= 50 ? '#f59e0b' : '#ef4444'
+                      }}
                     />
                     {stability >= 80 ? (
-                      <span className="text-xs text-green-500">Perfekt stabil</span>
+                      <span className="text-xs text-green-500 font-semibold">Perfekt stabil ✓</span>
                     ) : stability >= 50 ? (
                       <span className="text-xs text-yellow-500">Relativ stabil</span>
                     ) : (
@@ -445,17 +508,24 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                     )}
                   </div>
                   
-                  <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Druck</span>
-                      <span className="text-sm text-gray-500">{pressure.toFixed(0)}%</span>
+                      <span className="text-sm font-medium flex items-center">
+                        <ArrowDown className="w-4 h-4 mr-1 text-blue-500" />
+                        Druck
+                      </span>
+                      <span className="text-sm font-bold">{pressure.toFixed(0)}%</span>
                     </div>
                     <Progress 
                       value={pressure} 
                       className="h-2 bg-gray-200"
+                      style={{
+                        background: pressure >= 90 ? '#10b981' : 
+                                   pressure >= 50 ? '#f59e0b' : '#3b82f6'
+                      }}
                     />
                     {pressure >= 90 ? (
-                      <span className="text-xs text-green-500">Fusionsdruck erreicht!</span>
+                      <span className="text-xs text-green-500 font-semibold">Fusionsdruck erreicht! ✓</span>
                     ) : pressure >= 50 ? (
                       <span className="text-xs text-yellow-500">Mittlerer Druck</span>
                     ) : (
@@ -463,17 +533,24 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                     )}
                   </div>
                   
-                  <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Brennstoff</span>
-                      <span className="text-sm text-gray-500">{fuel.toFixed(0)}%</span>
+                      <span className="text-sm font-medium flex items-center">
+                        <CirclePlus className="w-4 h-4 mr-1 text-green-500" />
+                        Brennstoff
+                      </span>
+                      <span className="text-sm font-bold">{fuel.toFixed(0)}%</span>
                     </div>
                     <Progress 
                       value={fuel} 
                       className="h-2 bg-gray-200"
+                      style={{
+                        background: 'linear-gradient(to right, #ef4444, #f59e0b, #10b981)',
+                        opacity: fuel / 100
+                      }}
                     />
                     {fuel <= 10 ? (
-                      <span className="text-xs text-red-500">Kritisch niedrig!</span>
+                      <span className="text-xs text-red-500 font-semibold animate-pulse">Kritisch niedrig!</span>
                     ) : fuel <= 30 ? (
                       <span className="text-xs text-orange-500">Brennstoff niedrig</span>
                     ) : (
@@ -482,14 +559,20 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                   </div>
                 </div>
                 
-                <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                <div className="p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-100 shadow-sm">
                   <div className="flex justify-between mb-1">
-                    <span className="font-medium">Energieproduktion</span>
+                    <span className="font-medium flex items-center">
+                      <Sun className="w-4 h-4 mr-1 text-yellow-500" />
+                      Energieproduktion
+                    </span>
                     <span>{energy.toFixed(0)} MJ</span>
                   </div>
                   <Progress 
                     value={Math.min(100, energy / 100)} 
                     className="h-2 bg-gray-200"
+                    style={{
+                      background: 'linear-gradient(to right, #fbbf24, #f97316)',
+                    }}
                   />
                 </div>
                 
@@ -497,7 +580,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                   {phase === 'maintain' && (
                     <Button 
                       onClick={handleAddFuel}
-                      className="flex-1 bg-gradient-to-r from-blue-400 to-blue-600"
+                      className="flex-1 bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white shadow"
                       disabled={fuel >= MAX_FUEL}
                     >
                       <CirclePlus className="w-4 h-4 mr-2" />
@@ -508,7 +591,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                   <Button 
                     onClick={resetGame}
                     variant="outline" 
-                    className="flex-1"
+                    className="flex-1 hover:bg-gray-100"
                   >
                     Neustart
                   </Button>
@@ -518,22 +601,59 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
               </div>
             </div>
             
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-medium mb-2">Phase: {(() => {
-                switch(phase) {
-                  case 'plasma': return 'Plasma erzeugen';
-                  case 'stabilize': return 'Plasma stabilisieren';
-                  case 'fusion': return 'Fusion starten';
-                  case 'maintain': return 'Mini-Sonne pflegen';
-                  default: return '';
-                }
-              })()}</h3>
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100 shadow-sm">
+              <h3 className="font-medium mb-2 flex items-center">
+                {phase === 'plasma' && <Flame className="w-5 h-5 mr-2 text-red-500" />}
+                {phase === 'stabilize' && <Zap className="w-5 h-5 mr-2 text-purple-500" />}
+                {phase === 'fusion' && <ArrowDown className="w-5 h-5 mr-2 text-blue-500" />}
+                {phase === 'maintain' && <Sun className="w-5 h-5 mr-2 text-yellow-500" />}
+                {tutorialSteps[tutorialStep].title}
+              </h3>
               <p className="text-sm text-gray-700">
-                {phase === 'plasma' && 'Erhitze den Wasserstoff, um ein Plasma zu erzeugen! Du brauchst mindestens 10 Millionen Grad Celsius.'}
-                {phase === 'stabilize' && 'Nutze die Magnetfelder, um das Plasma stabil zu halten! Es versucht zu entkommen.'}
-                {phase === 'fusion' && 'Erhöhe den Druck, um die Kernfusion zu starten! Bei ausreichend Druck und Temperatur verschmelzen die Wasserstoffkerne.'}
-                {phase === 'maintain' && 'Deine Mini-Sonne brennt! Achte auf genügend Brennstoff und halte die Bedingungen stabil.'}
+                {tutorialSteps[tutorialStep].description}
               </p>
+              
+              {/* Progress bars for current goal */}
+              <div className="mt-3">
+                {phase === 'plasma' && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Ziel: {(PLASMA_THRESHOLD / 1000000).toFixed(1)} Mio. °C</span>
+                      <span>{Math.min(100, (temperature / PLASMA_THRESHOLD) * 100).toFixed(0)}%</span>
+                    </div>
+                    <Progress 
+                      value={Math.min(100, (temperature / PLASMA_THRESHOLD) * 100)} 
+                      className="h-1.5"
+                    />
+                  </div>
+                )}
+                
+                {phase === 'stabilize' && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Ziel: 80% Stabilität</span>
+                      <span>{Math.min(100, (stability / 80) * 100).toFixed(0)}%</span>
+                    </div>
+                    <Progress 
+                      value={Math.min(100, (stability / 80) * 100)} 
+                      className="h-1.5"
+                    />
+                  </div>
+                )}
+                
+                {phase === 'fusion' && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Ziel: 90% Druck</span>
+                      <span>{Math.min(100, (pressure / 90) * 100).toFixed(0)}%</span>
+                    </div>
+                    <Progress 
+                      value={Math.min(100, (pressure / 90) * 100)} 
+                      className="h-1.5"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

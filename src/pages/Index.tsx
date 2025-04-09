@@ -1,6 +1,7 @@
 
 import React from 'react';
 import Game from '@/components/Game';
+import MiniSunGame from '@/components/MiniSunGame';
 
 const Index = () => {
   return (
@@ -17,8 +18,17 @@ const Index = () => {
           </p>
         </header>
 
-        <main>
-          <Game />
+        <main className="space-y-10">
+          <section>
+            <h2 className="text-2xl font-bold mb-6 text-center">Mini-Sonnen Baukasten</h2>
+            <div className="max-w-4xl mx-auto">
+              <MiniSunGame />
+            </div>
+          </section>
+          
+          <section>
+            <Game />
+          </section>
         </main>
 
         <footer className="mt-12 text-center text-gray-500 text-sm py-4">
