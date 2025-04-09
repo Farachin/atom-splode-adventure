@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,12 +22,13 @@ interface MiniSunGameProps {
 type GamePhase = 'plasma' | 'stabilize' | 'fusion' | 'maintain';
 type StarType = 'none' | 'red-dwarf' | 'main-sequence' | 'blue-giant' | 'neutron';
 
-// Constants for game physics - lower thresholds for easier gameplay
+// Constants for game physics - SIGNIFICANTLY reduced thresholds
 const MIN_TEMPERATURE = 20; // Room temperature in C
-const PLASMA_THRESHOLD = 3000000; // Further lowered for easier gameplay
-const FUSION_THRESHOLD = 50000000; // Lowered for easier gameplay
+const PLASMA_THRESHOLD = 2000000; // Lowered for easier gameplay
+const FUSION_THRESHOLD = 30000000; // Lowered further for easier gameplay
 const MAX_TEMPERATURE = 500000000; // 500 million C
 
+// Constants for game physics - SIGNIFICANTLY reduced thresholds
 const MIN_STABILITY = 0;
 const MAX_STABILITY = 100;
 
@@ -59,11 +59,11 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
   const lastTickRef = useRef<number>(Date.now());
   const { toast } = useToast();
 
-  // Tutorial steps
+  // Tutorial steps - updated to match new thresholds
   const tutorialSteps = [
     {
       title: "Schritt 1: Plasma erzeugen",
-      description: "Um eine Sonne zu erschaffen, musst du zuerst ein super heißes Plasma machen! Klicke und halte gedrückt, um das Gas zu erhitzen. Du brauchst mindestens 3 Millionen Grad!"
+      description: "Um eine Sonne zu erschaffen, musst du zuerst ein super heißes Plasma machen! Klicke und halte gedrückt, um das Gas zu erhitzen. Du brauchst mindestens 2 Millionen Grad!"
     },
     {
       title: "Schritt 2: Plasma stabilisieren",
@@ -79,7 +79,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
     }
   ];
 
-  // Handle phase transitions
+  // Handle phase transitions - updated to match new thresholds
   useEffect(() => {
     if (phase === 'plasma' && temperature >= PLASMA_THRESHOLD) {
       toast({
@@ -89,7 +89,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
       });
       setPhase('stabilize');
       setTutorialStep(1);
-    } else if (phase === 'stabilize' && stability >= 80 && temperature >= FUSION_THRESHOLD) {
+    } else if (phase === 'stabilize' && stability >= 80 && temperature >= PLASMA_THRESHOLD) { // Lower temperature requirement
       toast({
         title: "Plasma ist stabil!",
         description: "Jetzt kannst du den Druck erhöhen, um die Fusion zu starten!",
@@ -113,7 +113,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
     }
   }, [temperature, stability, pressure, phase, starType, toast]);
 
-  // Game loop
+  // Game loop - DRASTICALLY reduced cooling rates
   useEffect(() => {
     if (!gameActive) return;
 
@@ -124,12 +124,12 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
 
       // Update game state based on current phase
       if (phase === 'plasma') {
-        // Temperature slowly drops unless being heated - EXTREMELY reduced cooling rate
-        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (100000 * deltaTime))); // Further reduced cooling
+        // Temperature drops extremely slowly
+        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (10000 * deltaTime))); 
       } else if (phase === 'stabilize') {
-        // Temperature drops faster, stability decreases - EXTREMELY reduced cooling rate
-        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (200000 * deltaTime))); // Further reduced cooling
-        setStability(prev => Math.max(0, prev - (2 * deltaTime))); // Reduced stability loss
+        // Temperature and stability drop very slowly
+        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (20000 * deltaTime))); 
+        setStability(prev => Math.max(0, prev - (1 * deltaTime))); 
         
         // If temperature drops below plasma threshold, go back to plasma phase
         if (temperature < PLASMA_THRESHOLD) {
@@ -142,10 +142,10 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
           });
         }
       } else if (phase === 'fusion') {
-        // Temperature and stability drop, pressure drops - EXTREMELY reduced rates
-        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (300000 * deltaTime))); // Further reduced cooling
-        setStability(prev => Math.max(0, prev - (2 * deltaTime))); // Reduced stability loss
-        setPressure(prev => Math.max(0, prev - (3 * deltaTime))); // Reduced pressure loss
+        // All rates reduced drastically
+        setTemperature(prev => Math.max(MIN_TEMPERATURE, prev - (30000 * deltaTime))); 
+        setStability(prev => Math.max(0, prev - (0.5 * deltaTime))); 
+        setPressure(prev => Math.max(0, prev - (0.5 * deltaTime))); 
         
         // If stability or temperature gets too low, go back to appropriate phase
         if (stability < 30) {

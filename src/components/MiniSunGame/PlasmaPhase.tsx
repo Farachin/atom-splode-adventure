@@ -125,7 +125,7 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     return () => clearInterval(interval);
   }, [temperature, magnetActive]);
 
-  // Handle mouse hold for heating
+  // Handle mouse hold for heating - SIGNIFICANTLY BOOSTED
   useEffect(() => {
     if (isMouseDown && mouseDownPosition) {
       if (!heatingIntervalRef.current) {
@@ -133,10 +133,12 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
         
         heatingIntervalRef.current = window.setInterval(() => {
           const holdDuration = (Date.now() - mouseHoldTimeRef.current) / 1000;
-          const newHeatMultiplier = Math.min(50, 1 + holdDuration * 15); // Faster multiplier growth
+          // Much faster multiplier growth
+          const newHeatMultiplier = Math.min(100, 1 + holdDuration * 30);
           setHeatMultiplier(newHeatMultiplier);
           
-          setHeatingIntensity(prev => Math.min(prev + 2, 30)); // Faster intensity growth
+          // Faster intensity growth
+          setHeatingIntensity(prev => Math.min(prev + 5, 50));
           
           setEffects(prev => [...prev, {
             id: Date.now(),
@@ -146,8 +148,9 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
           }]);
           
           const secondsSinceLastHeat = 0.1;
-          const baseHeatPerSecond = 1000000; // 1 million per second base
-          const heatIncrement = baseHeatPerSecond * secondsSinceLastHeat * (1 + heatingIntensity * 0.5) * newHeatMultiplier;
+          // Base heat rate drastically increased - 5 million per second base
+          const baseHeatPerSecond = 5000000;
+          const heatIncrement = baseHeatPerSecond * secondsSinceLastHeat * (1 + heatingIntensity) * newHeatMultiplier;
           
           onTemperatureChange(temperature + heatIncrement);
         }, 100);
@@ -170,7 +173,7 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
     };
   }, [isMouseDown, mouseDownPosition, temperature, onTemperatureChange, heatingIntensity]);
 
-  // Handle auto heater
+  // Handle auto heater - SIGNIFICANTLY BOOSTED
   useEffect(() => {
     if (autoHeaterActive && !autoHeaterRef.current) {
       autoHeaterRef.current = window.setInterval(() => {
@@ -180,7 +183,7 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
         
         setEffects(prev => {
           const newEffects = [...prev];
-          for (let i = 0; i < 2; i++) {
+          for (let i = 0; i < 3; i++) { // More heating effects
             newEffects.push({
               id: Date.now() + i,
               x: Math.random() * width,
@@ -191,7 +194,8 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
           return newEffects;
         });
         
-        onTemperatureChange(temperature + 25000000); // Increased power
+        // Massive boost to auto heater power - 50 million per interval
+        onTemperatureChange(temperature + 50000000);
       }, 500);
     } else if (!autoHeaterActive && autoHeaterRef.current) {
       clearInterval(autoHeaterRef.current);
@@ -224,7 +228,8 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       type: 'heat'
     }]);
     
-    onTemperatureChange(temperature + 5000000); // Initial heating boost
+    // Initial heating boost increased to 10 million
+    onTemperatureChange(temperature + 10000000);
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -262,7 +267,8 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
       type: 'laser'
     }]);
     
-    onTemperatureChange(temperature + 20000000); // Increased power
+    // Laser power increased to 40 million
+    onTemperatureChange(temperature + 40000000);
     setLastLaser(Date.now());
   };
 
@@ -342,10 +348,20 @@ const PlasmaPhase: React.FC<PlasmaPhaseProps> = ({
             top: mouseDownPosition?.y ? mouseDownPosition.y - 30 : 0,
             transition: 'all 0.2s',
             opacity: Math.min(1, (heatMultiplier - 1) / 5),
-            transform: `scale(${Math.min(2, 1 + (heatMultiplier - 1) / 10)})`
+            transform: `scale(${Math.min(2, 1 + (heatMultiplier - 1) / 10)})`,
+            animation: heatMultiplier > 20 ? 'pulse 0.5s infinite' : 'none'
           }}
         >
           {heatMultiplier.toFixed(1)}x <ArrowUp className="w-3 h-3 inline ml-1" />
+        </div>
+      )}
+      
+      {/* Add a temperature indicator directly on the plasma phase */}
+      {temperature > 1000000 && (
+        <div 
+          className="absolute top-16 right-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-sm z-30 shadow-lg"
+        >
+          {(temperature / 1000000).toFixed(1)} Mio. °C
         </div>
       )}
       
