@@ -95,7 +95,7 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     toast({
       title: isDecayMode ? "Zerfallssimulation gestartet" : "Kettenreaktionssimulation gestartet",
       description: isDecayMode 
-        ? `Halbwertszeit: ${halfLife} Zeitschritte` 
+        ? `Halbwertszeit: ${halfLife} Jahre` 
         : `Multiplikationsfaktor: ${kFactor.toFixed(2)}`,
     });
   };
@@ -209,7 +209,7 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
         handleStopSimulation();
         toast({
           title: "Zerfallsprozess abgeschlossen",
-          description: `Simulation über ${decayDuration} Zeitschritte abgeschlossen.`,
+          description: `Simulation über ${decayDuration} Jahre abgeschlossen.`,
         });
       } else if (newNeutrons < 1 && prevNeutrons > 0) {
         handleStopSimulation();
@@ -342,7 +342,7 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
                   <div>
                     <div className="flex justify-between mb-2">
                       <span>Halbwertszeit</span>
-                      <span>{halfLife} Zeitschritte</span>
+                      <span>{halfLife} Jahre</span>
                     </div>
                     <Slider
                       value={[halfLife]}
@@ -357,7 +357,7 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
                   <div>
                     <div className="flex justify-between mb-2">
                       <span>Simulationsdauer</span>
-                      <span>{decayDuration} Zeitschritte</span>
+                      <span>{decayDuration} Jahre</span>
                     </div>
                     <Slider
                       value={[decayDuration]}
@@ -510,7 +510,7 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis 
                       dataKey="step"
-                      label={{ value: 'Zeit', position: 'insideBottomRight', offset: -5 }}
+                      label={{ value: isDecayMode ? 'Jahre' : 'Zeit', position: 'insideBottomRight', offset: -5 }}
                     />
                     <YAxis 
                       label={{ 
@@ -525,7 +525,7 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
                     />
                     <Tooltip 
                       formatter={(value: number) => [formatNumber(value), isDecayMode ? 'Atome' : 'Neutronen']}
-                      labelFormatter={(label) => `Schritt ${label}`}
+                      labelFormatter={(label) => isDecayMode ? `Jahr ${label}` : `Schritt ${label}`}
                     />
                     <Line 
                       type="monotone" 
