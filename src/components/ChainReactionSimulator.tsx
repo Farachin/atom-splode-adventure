@@ -88,12 +88,8 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
       resetSimulation();
     }
     
-    const newNeutronCount = [...neutronCount];
-    newNeutronCount[0] = initialNeutrons;
-    setNeutronCount(newNeutronCount);
-    
+    setNeutronCount([initialNeutrons]);
     setChartData([{ step: 0, neutrons: initialNeutrons }]);
-    
     setIsSimulating(true);
     
     toast({
@@ -130,74 +126,96 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
   };
 
   const simulateChainReaction = () => {
-    const prevNeutrons = neutronCount[neutronCount.length - 1];
-    
-    let newNeutrons = Math.round(prevNeutrons * kFactor);
-    
-    const randomFactor = 0.9 + Math.random() * 0.2;
-    newNeutrons = Math.round(newNeutrons * randomFactor);
-    
-    newNeutrons = Math.max(0, newNeutrons);
-    
-    const updatedNeutronCount = [...neutronCount, newNeutrons];
-    setNeutronCount(updatedNeutronCount);
-    
-    const updatedChartData = [...chartData, { step: currentStep + 1, neutrons: newNeutrons }];
-    setChartData(updatedChartData);
-    
-    if (updatedNeutronCount.length > 50) {
-      setNeutronCount(updatedNeutronCount.slice(updatedNeutronCount.length - 50));
-    }
-    
-    if (updatedChartData.length > 100) {
-      setChartData(updatedChartData.slice(updatedChartData.length - 100));
-    }
-    
-    if (newNeutrons > 1000000) {
-      handleStopSimulation();
-      toast({
-        title: "Simulation überlastet",
-        description: "Die Neutronenzahl ist explodiert! Simulation gestoppt.",
-        variant: "destructive",
+    setNeutronCount(prevNeutronCount => {
+      const prevNeutrons = prevNeutronCount[prevNeutronCount.length - 1];
+      
+      const randomFactor = 0.9 + Math.random() * 0.2;
+      const effectiveK = kFactor * randomFactor;
+      
+      let newNeutrons = Math.round(prevNeutrons * effectiveK);
+      
+      newNeutrons = Math.max(0, newNeutrons);
+      
+      const updatedNeutronCount = [...prevNeutronCount, newNeutrons];
+      
+      setChartData(prevChartData => {
+        const updatedChartData = [...prevChartData, { 
+          step: prevChartData.length, 
+          neutrons: newNeutrons 
+        }];
+        
+        if (updatedChartData.length > 100) {
+          return updatedChartData.slice(updatedChartData.length - 100);
+        }
+        
+        return updatedChartData;
       });
-    } else if (newNeutrons === 0 && prevNeutrons > 0) {
-      handleStopSimulation();
-      toast({
-        title: "Reaktion erloschen",
-        description: "Alle Neutronen wurden absorbiert oder entkamen. Reaktion erloschen.",
-      });
-    }
+      
+      if (updatedNeutronCount.length > 50) {
+        return updatedNeutronCount.slice(updatedNeutronCount.length - 50);
+      }
+      
+      if (newNeutrons > 1000000) {
+        handleStopSimulation();
+        toast({
+          title: "Simulation überlastet",
+          description: "Die Neutronenzahl ist explodiert! Simulation gestoppt.",
+          variant: "destructive",
+        });
+      } else if (newNeutrons === 0 && prevNeutrons > 0) {
+        handleStopSimulation();
+        toast({
+          title: "Reaktion erloschen",
+          description: "Alle Neutronen wurden absorbiert oder entkamen. Reaktion erloschen.",
+        });
+      }
+      
+      return updatedNeutronCount;
+    });
   };
 
   const simulateDecay = () => {
-    const prevNeutrons = neutronCount[neutronCount.length - 1];
-    
-    const decayFactor = Math.pow(0.5, 1 / halfLife);
-    let newNeutrons = Math.round(prevNeutrons * decayFactor);
-    
-    const updatedNeutronCount = [...neutronCount, newNeutrons];
-    setNeutronCount(updatedNeutronCount);
-    
-    const updatedChartData = [...chartData, { step: currentStep + 1, neutrons: newNeutrons }];
-    setChartData(updatedChartData);
-    
-    if (updatedNeutronCount.length > 50) {
-      setNeutronCount(updatedNeutronCount.slice(updatedNeutronCount.length - 50));
-    }
-    
-    if (currentStep >= decayDuration) {
-      handleStopSimulation();
-      toast({
-        title: "Zerfallsprozess abgeschlossen",
-        description: `Simulation über ${decayDuration} Zeitschritte abgeschlossen.`,
+    setNeutronCount(prevNeutronCount => {
+      const prevNeutrons = prevNeutronCount[prevNeutronCount.length - 1];
+      
+      const decayFactor = Math.pow(0.5, 1 / halfLife);
+      let newNeutrons = Math.round(prevNeutrons * decayFactor);
+      
+      const updatedNeutronCount = [...prevNeutronCount, newNeutrons];
+      
+      setChartData(prevChartData => {
+        const updatedChartData = [...prevChartData, { 
+          step: prevChartData.length, 
+          neutrons: newNeutrons 
+        }];
+        
+        if (updatedChartData.length > 100) {
+          return updatedChartData.slice(updatedChartData.length - 100);
+        }
+        
+        return updatedChartData;
       });
-    } else if (newNeutrons < 1 && prevNeutrons > 0) {
-      handleStopSimulation();
-      toast({
-        title: "Zerfallsprozess abgeschlossen",
-        description: "Das Material ist vollständig zerfallen.",
-      });
-    }
+      
+      if (updatedNeutronCount.length > 50) {
+        return updatedNeutronCount.slice(updatedNeutronCount.length - 50);
+      }
+      
+      if (currentStep >= decayDuration) {
+        handleStopSimulation();
+        toast({
+          title: "Zerfallsprozess abgeschlossen",
+          description: `Simulation über ${decayDuration} Zeitschritte abgeschlossen.`,
+        });
+      } else if (newNeutrons < 1 && prevNeutrons > 0) {
+        handleStopSimulation();
+        toast({
+          title: "Zerfallsprozess abgeschlossen",
+          description: "Das Material ist vollständig zerfallen.",
+        });
+      }
+      
+      return updatedNeutronCount;
+    });
   };
 
   const drawNeutronVisualization = () => {
@@ -497,6 +515,9 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
                         style: { textAnchor: 'middle' }
                       }}
                       tickFormatter={formatNumber}
+                      scale="log"
+                      domain={['auto', 'auto']}
+                      allowDataOverflow={true}
                     />
                     <Tooltip 
                       formatter={(value: number) => [formatNumber(value), isDecayMode ? 'Atome' : 'Neutronen']}
@@ -530,15 +551,15 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
                 <p>
                   Die Halbwertszeit ist die Zeit, nach der die Hälfte aller radioaktiven Atome zerfallen ist. 
                   Nach 2 Halbwertszeiten ist nur noch 1/4, nach 3 Halbwertszeiten nur noch 1/8 der ursprünglichen Menge übrig.
-                  Bei dieser Simulation kannst du den Verlauf über viele Halbwertszeiten beobachten.
+                  Bei dieser Simulation kannst du den exponentiellen Zerfallsprozess beobachten.
                 </p>
               ) : (
                 <p>
                   Der Multiplikationsfaktor k bestimmt das Reaktorverhalten:<br />
                   • k &lt; 1: Reaktion stirbt ab (unterkritisch)<br />
                   • k = 1: Stabile Reaktion (kritisch)<br />
-                  • k &gt; 1: Unkontrollierte Kettenreaktion (überkritisch)<br />
-                  • Bei k = 2: Jede Spaltung erzeugt 2 neue Neutronen (wie bei einer Kernwaffe)
+                  • k &gt; 1: Exponentielles Wachstum (überkritisch)<br />
+                  • Bei k = 2: Jede Spaltung erzeugt 2 neue Neutronen - die Neutronenzahl verdoppelt sich bei jedem Schritt!
                 </p>
               )}
             </div>
