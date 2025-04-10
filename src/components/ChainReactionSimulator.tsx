@@ -181,6 +181,11 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
       const decayFactor = Math.pow(0.5, 1 / halfLife);
       let newNeutrons = Math.round(prevNeutrons * decayFactor);
       
+      const randomFactor = 0.95 + Math.random() * 0.1;
+      newNeutrons = Math.round(newNeutrons * randomFactor);
+      
+      newNeutrons = Math.max(0, newNeutrons);
+      
       const updatedNeutronCount = [...prevNeutronCount, newNeutrons];
       
       setChartData(prevChartData => {
@@ -550,16 +555,16 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
               {isDecayMode ? (
                 <p>
                   Die Halbwertszeit ist die Zeit, nach der die Hälfte aller radioaktiven Atome zerfallen ist. 
-                  Nach 2 Halbwertszeiten ist nur noch 1/4, nach 3 Halbwertszeiten nur noch 1/8 der ursprünglichen Menge übrig.
-                  Bei dieser Simulation kannst du den exponentiellen Zerfallsprozess beobachten.
+                  Dies folgt einer exponentiellen Funktion: Nach 2 Halbwertszeiten ist nur noch 1/4, nach 3 Halbwertszeiten nur noch 1/8 der ursprünglichen Menge übrig.
+                  In dieser Simulation kannst du diesen exponentiellen Abfall deutlich beobachten.
                 </p>
               ) : (
                 <p>
                   Der Multiplikationsfaktor k bestimmt das Reaktorverhalten:<br />
-                  • k &lt; 1: Reaktion stirbt ab (unterkritisch)<br />
+                  • k &lt; 1: Reaktion stirbt exponentiell ab (unterkritisch)<br />
                   • k = 1: Stabile Reaktion (kritisch)<br />
                   • k &gt; 1: Exponentielles Wachstum (überkritisch)<br />
-                  • Bei k = 2: Jede Spaltung erzeugt 2 neue Neutronen - die Neutronenzahl verdoppelt sich bei jedem Schritt!
+                  • Bei k = 2: Die Neutronenzahl verdoppelt sich bei jedem Schritt, was zu einer exponentiellen Zunahme führt!
                 </p>
               )}
             </div>
