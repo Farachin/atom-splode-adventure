@@ -49,7 +49,25 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
     const simulationInterval = 1000 / simulationSpeed;
     
     simulationRef.current = setInterval(() => {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep(prev => {
+        const nextStep = prev + 1;
+        
+        if (isDecayMode && nextStep >= decayDuration) {
+          if (simulationRef.current) {
+            clearInterval(simulationRef.current);
+          }
+          setIsSimulating(false);
+          
+          toast({
+            title: "Zerfallsprozess abgeschlossen",
+            description: `Simulation über ${decayDuration} Jahre abgeschlossen.`,
+          });
+          
+          return nextStep;
+        }
+        
+        return nextStep;
+      });
       
       if (isDecayMode) {
         simulateDecay();
@@ -63,7 +81,7 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
         clearInterval(simulationRef.current);
       }
     };
-  }, [isSimulating, simulationSpeed, kFactor, isDecayMode, halfLife]);
+  }, [isSimulating, simulationSpeed, kFactor, isDecayMode, halfLife, decayDuration]);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -205,13 +223,7 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
         return updatedNeutronCount.slice(updatedNeutronCount.length - 50);
       }
       
-      if (currentStep >= decayDuration) {
-        handleStopSimulation();
-        toast({
-          title: "Zerfallsprozess abgeschlossen",
-          description: `Simulation über ${decayDuration} Jahre abgeschlossen.`,
-        });
-      } else if (newNeutrons < 1 && prevNeutrons > 0) {
+      if (newNeutrons < 1 && prevNeutrons > 0) {
         handleStopSimulation();
         toast({
           title: "Zerfallsprozess abgeschlossen",
