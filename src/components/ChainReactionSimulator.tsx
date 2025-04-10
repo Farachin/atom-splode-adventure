@@ -520,7 +520,6 @@ const ChainReactionSimulator: React.FC<ChainReactionSimulatorProps> = ({ classNa
                         style: { textAnchor: 'middle' }
                       }}
                       tickFormatter={formatNumber}
-                      scale="log"
                       domain={['auto', 'auto']}
                       allowDataOverflow={true}
                     />
