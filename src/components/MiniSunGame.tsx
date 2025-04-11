@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import PlasmaPhase from './MiniSunGame/PlasmaPhase';
 import StabilizationPhase from './MiniSunGame/StabilizationPhase';
 import FusionPhase from './MiniSunGame/FusionPhase';
 import StarMaintenancePhase from './MiniSunGame/StarMaintenancePhase';
+import BlackHolePhase from './MiniSunGame/BlackHolePhase';
 import AchievementsPanel from './MiniSunGame/AchievementsPanel';
 
 interface MiniSunGameProps {
@@ -19,8 +21,8 @@ interface MiniSunGameProps {
   onEnergyProduced?: (amount: number) => void;
 }
 
-type GamePhase = 'plasma' | 'stabilize' | 'fusion' | 'maintain';
-type StarType = 'none' | 'red-dwarf' | 'main-sequence' | 'blue-giant' | 'neutron';
+type GamePhase = 'plasma' | 'stabilize' | 'fusion' | 'maintain' | 'black-hole';
+type StarType = 'none' | 'red-dwarf' | 'main-sequence' | 'blue-giant' | 'neutron' | 'black-hole';
 
 // Constants for game physics - SIGNIFICANTLY reduced thresholds
 const MIN_TEMPERATURE = 20; // Room temperature in C
@@ -38,6 +40,9 @@ const MAX_PRESSURE = 100;
 const MIN_FUEL = 0;
 const MAX_FUEL = 100;
 
+// Mass thresholds for stellar evolution
+const BLACK_HOLE_MASS_THRESHOLD = 150; // Solar masses
+
 const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }) => {
   // Game state
   const [phase, setPhase] = useState<GamePhase>('plasma');
@@ -50,6 +55,9 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
   const [starType, setStarType] = useState<StarType>('none');
   const [starSize, setStarSize] = useState<number>(0);
   const [starAge, setStarAge] = useState<number>(0);
+  const [starMass, setStarMass] = useState<number>(0);
+  const [blackHoleSize, setBlackHoleSize] = useState<number>(0);
+  const [blackHoleGravity, setBlackHoleGravity] = useState<number>(0);
   const [gameActive, setGameActive] = useState<boolean>(false);
   const [showTutorial, setShowTutorial] = useState<boolean>(true);
   const [tutorialStep, setTutorialStep] = useState<number>(0);
@@ -76,6 +84,10 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
     {
       title: "Schritt 4: Deine Mini-Sonne pflegen",
       description: "Toll gemacht! Deine Sonne brennt jetzt. Halte sie am Leben, indem du Brennstoff hinzufügst, wenn er niedrig wird."
+    },
+    {
+      title: "Schwarzes Loch!",
+      description: "Deine Sonne ist so massereich geworden, dass sie unter ihrer eigenen Schwerkraft kollabiert ist und ein Schwarzes Loch entstanden ist! Beobachte, wie es Materie verschlingt und Energie in Form von Hawking-Strahlung aussendet."
     }
   ];
 
@@ -106,12 +118,31 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
           variant: "default",
         });
         setStarType('red-dwarf');
+        setStarMass(10); // Initial star mass
         unlockAchievement('first-fusion');
         setPhase('maintain');
         setTutorialStep(3);
       }
     }
   }, [temperature, stability, pressure, phase, starType, toast]);
+
+  // Check for black hole formation
+  useEffect(() => {
+    if (phase === 'maintain' && starMass >= BLACK_HOLE_MASS_THRESHOLD && starType !== 'black-hole') {
+      // Transition to black hole
+      toast({
+        title: "Schwarzes Loch entstanden!",
+        description: "Deine Sonne ist unter ihrer eigenen Schwerkraft kollabiert und ein Schwarzes Loch ist entstanden!",
+        variant: "default",
+      });
+      setStarType('black-hole');
+      setPhase('black-hole');
+      setTutorialStep(4);
+      setBlackHoleSize(starSize / 4); // Black hole is much smaller than the star
+      setBlackHoleGravity(100); // Maximum gravity
+      unlockAchievement('black-hole-created');
+    }
+  }, [starMass, phase, starType, starSize, toast]);
 
   // Game loop - DRASTICALLY reduced cooling rates
   useEffect(() => {
@@ -169,10 +200,16 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         // Your star burns fuel and produces energy
         const fuelConsumptionRate = getStarFuelConsumption(starType);
         const energyProductionRate = getStarEnergyProduction(starType);
+        const massGainRate = getStarMassGain(starType);
         
         setFuel(prev => Math.max(0, prev - (fuelConsumptionRate * deltaTime)));
         setEnergy(prev => prev + (energyProductionRate * deltaTime));
         setStarAge(prev => prev + deltaTime);
+        
+        // Star gains mass as it fuses elements
+        if (fuel > 10) {
+          setStarMass(prev => prev + (massGainRate * deltaTime));
+        }
         
         // Pass energy to parent component
         if (onEnergyProduced) {
@@ -186,6 +223,19 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         
         // Evolve star based on age
         evolveStarBasedOnAge();
+      } else if (phase === 'black-hole') {
+        // Black hole mechanics
+        // It grows slowly by absorbing nearby matter
+        setBlackHoleSize(prev => prev + (0.05 * deltaTime));
+        
+        // Energy production from hawking radiation (very small but constant)
+        const hawkingRadiationEnergy = 0.5 * deltaTime;
+        setEnergy(prev => prev + hawkingRadiationEnergy);
+        
+        // Pass energy to parent component
+        if (onEnergyProduced) {
+          onEnergyProduced(hawkingRadiationEnergy * 0.1);
+        }
       }
 
       gameLoopRef.current = requestAnimationFrame(gameLoop);
@@ -198,7 +248,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         cancelAnimationFrame(gameLoopRef.current);
       }
     };
-  }, [gameActive, phase, temperature, stability, pressure, fuel, starType, onEnergyProduced]);
+  }, [gameActive, phase, temperature, stability, pressure, fuel, starType, onEnergyProduced, starMass]);
 
   // Helper functions
   const getStarFuelConsumption = (type: StarType): number => {
@@ -207,6 +257,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
       case 'main-sequence': return 5;
       case 'blue-giant': return 15;
       case 'neutron': return 0.5;
+      case 'black-hole': return 0; // Black holes don't consume fuel in the traditional sense
       default: return 0;
     }
   };
@@ -217,6 +268,18 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
       case 'main-sequence': return 15;
       case 'blue-giant': return 50;
       case 'neutron': return 25;
+      case 'black-hole': return 10; // Hawking radiation produces relatively little energy
+      default: return 0;
+    }
+  };
+
+  const getStarMassGain = (type: StarType): number => {
+    // Rate at which the star gains mass from fusion processes
+    switch (type) {
+      case 'red-dwarf': return 0.2;
+      case 'main-sequence': return 0.5;
+      case 'blue-giant': return 1.5;
+      case 'neutron': return 0.1;
       default: return 0;
     }
   };
@@ -227,6 +290,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
       case 'main-sequence': return 'Hauptreihenstern';
       case 'blue-giant': return 'Blauer Riese';
       case 'neutron': return 'Neutronenstern';
+      case 'black-hole': return 'Schwarzes Loch';
       default: return 'Keine Sonne';
     }
   };
@@ -235,6 +299,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
     if (starType === 'red-dwarf' && starAge > 30 && fuel > 50) {
       setStarType('main-sequence');
       setStarSize(prev => prev + 1);
+      setStarMass(prev => prev + 20); // Mass increases with evolution
       unlockAchievement('main-sequence');
       toast({
         title: "Sternevolution!",
@@ -244,6 +309,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
     } else if (starType === 'main-sequence' && starAge > 60 && fuel > 70) {
       setStarType('blue-giant');
       setStarSize(prev => prev + 2);
+      setStarMass(prev => prev + 40); // Significant mass increase
       unlockAchievement('blue-giant');
       toast({
         title: "Sternevolution!",
@@ -255,18 +321,35 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
 
   const starDeath = () => {
     if (starType === 'blue-giant') {
-      // Supernova explosion
-      toast({
-        title: "Supernova!",
-        description: "Dein Blauer Riese ist in einer spektakulären Supernova explodiert!",
-        variant: "default",
-      });
-      unlockAchievement('supernova');
-      setStarType('neutron');
-      setStarSize(1);
-      
-      // Some leftover fuel from explosion
-      setFuel(20);
+      // Check if mass is enough for black hole formation but not quite at the threshold
+      if (starMass >= BLACK_HOLE_MASS_THRESHOLD * 0.8) {
+        // Collapse into black hole
+        toast({
+          title: "Gravitationskollaps!",
+          description: "Dein Blauer Riese ist kollabiert und ein Schwarzes Loch ist entstanden!",
+          variant: "default",
+        });
+        unlockAchievement('black-hole-created');
+        setStarType('black-hole');
+        setPhase('black-hole');
+        setTutorialStep(4);
+        setBlackHoleSize(starSize / 4);
+        setBlackHoleGravity(100);
+      } else {
+        // Supernova explosion
+        toast({
+          title: "Supernova!",
+          description: "Dein Blauer Riese ist in einer spektakulären Supernova explodiert!",
+          variant: "default",
+        });
+        unlockAchievement('supernova');
+        setStarType('neutron');
+        setStarMass(Math.max(5, starMass / 10)); // Most mass is ejected
+        setStarSize(1);
+        
+        // Some leftover fuel from explosion
+        setFuel(20);
+      }
     } else {
       // Normal star death
       toast({
@@ -288,7 +371,8 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
         'blue-giant': 'Gigantische Leistung',
         'perfect-stability': 'Plasma-Meister',
         'long-life': 'Mini-Sternenforscher',
-        'supernova': 'Supernova-Entdecker'
+        'supernova': 'Supernova-Entdecker',
+        'black-hole-created': 'Schwarzes Loch Entdecker'
       };
       
       toast({
@@ -314,6 +398,9 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
     setStarType('none');
     setStarSize(0);
     setStarAge(0);
+    setStarMass(0);
+    setBlackHoleSize(0);
+    setBlackHoleGravity(0);
     setTutorialStep(0);
   };
 
@@ -358,7 +445,12 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
           {starType !== 'none' ? (
             <Badge 
               variant="outline"
-              className="px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-yellow-500"
+              className={cn(
+                "px-3 py-1 border text-white",
+                starType === 'black-hole' 
+                  ? "bg-gradient-to-r from-purple-900 to-indigo-900 border-purple-700" 
+                  : "bg-gradient-to-r from-yellow-400 to-orange-500 border-yellow-500"
+              )}
             >
               {getStarName(starType)}
             </Badge>
@@ -450,6 +542,15 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                     onTemperatureChange={setTemperature}
                     onStabilityChange={setStability}
                     onFuelChange={setFuel}
+                  />
+                )}
+
+                {phase === 'black-hole' && (
+                  <BlackHolePhase 
+                    blackHoleSize={blackHoleSize}
+                    blackHoleGravity={blackHoleGravity}
+                    setBlackHoleSize={setBlackHoleSize}
+                    setBlackHoleGravity={setBlackHoleGravity}
                   />
                 )}
               </div>
@@ -559,6 +660,32 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                   </div>
                 </div>
                 
+                <div className="p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm font-medium flex items-center">
+                      <Star className="w-4 h-4 mr-1 text-purple-500" />
+                      Sternmasse
+                    </span>
+                    <span className="text-sm font-bold">{starMass.toFixed(1)} M☉</span>
+                  </div>
+                  <Progress 
+                    value={(starMass / BLACK_HOLE_MASS_THRESHOLD) * 100} 
+                    className="h-2 bg-gray-200"
+                    style={{
+                      background: 'linear-gradient(to right, #3b82f6, #8b5cf6, #6b21a8)',
+                    }}
+                  />
+                  {starMass >= BLACK_HOLE_MASS_THRESHOLD * 0.9 ? (
+                    <span className="text-xs text-purple-500 font-semibold animate-pulse">Gravitationskollaps droht!</span>
+                  ) : starMass >= BLACK_HOLE_MASS_THRESHOLD * 0.7 ? (
+                    <span className="text-xs text-purple-500">Extrem schwerer Stern</span>
+                  ) : starMass >= 50 ? (
+                    <span className="text-xs text-blue-500">Massereicher Stern</span>
+                  ) : (
+                    <span className="text-xs text-gray-500">Normale Sternmasse</span>
+                  )}
+                </div>
+                
                 <div className="p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-100 shadow-sm">
                   <div className="flex justify-between mb-1">
                     <span className="font-medium flex items-center">
@@ -607,6 +734,7 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                 {phase === 'stabilize' && <Zap className="w-5 h-5 mr-2 text-purple-500" />}
                 {phase === 'fusion' && <ArrowDown className="w-5 h-5 mr-2 text-blue-500" />}
                 {phase === 'maintain' && <Sun className="w-5 h-5 mr-2 text-yellow-500" />}
+                {phase === 'black-hole' && <Circle className="w-5 h-5 mr-2 text-purple-900" />}
                 {tutorialSteps[tutorialStep].title}
               </h3>
               <p className="text-sm text-gray-700">
@@ -649,6 +777,19 @@ const MiniSunGame: React.FC<MiniSunGameProps> = ({ className, onEnergyProduced }
                     </div>
                     <Progress 
                       value={Math.min(100, (pressure / 90) * 100)} 
+                      className="h-1.5"
+                    />
+                  </div>
+                )}
+                
+                {phase === 'maintain' && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Sternmasse: {starMass.toFixed(1)} M☉</span>
+                      <span>{Math.min(100, (starMass / BLACK_HOLE_MASS_THRESHOLD) * 100).toFixed(0)}% zum Schwarzen Loch</span>
+                    </div>
+                    <Progress 
+                      value={Math.min(100, (starMass / BLACK_HOLE_MASS_THRESHOLD) * 100)} 
                       className="h-1.5"
                     />
                   </div>
