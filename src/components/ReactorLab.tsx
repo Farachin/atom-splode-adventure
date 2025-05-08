@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Thermometer, Droplets, Zap, Fan, Atom, AlertTriangle, Flask, Beaker } from 'lucide-react';
+import { Thermometer, Droplets, Zap, Fan, Atom, AlertTriangle, Beaker } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ReactorVisualizer from './ReactorVisualizer';
@@ -487,7 +486,7 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
                     disabled={isRunning}
                   >
                     <div className="flex items-center">
-                      <Flask className="h-5 w-5 mr-2 text-orange-400" />
+                      <Beaker className="h-5 w-5 mr-2 text-orange-400" />
                       <span className="font-bold">Thoriumreaktor</span>
                     </div>
                     <p className="text-xs text-gray-500">Flüssigsalz, sicherer, weniger Müll</p>
@@ -734,4 +733,3 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
 };
 
 export default ReactorLab;
-
