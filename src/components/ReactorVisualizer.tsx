@@ -8,11 +8,12 @@ interface ReactorVisualizerProps {
   coolantFlow: number;
   controlRodLevel: number;
   isRunning: boolean;
-  coolantType: 'water' | 'sodium' | 'helium';
+  coolantType: 'water' | 'sodium' | 'helium' | 'molten-salt';
   efficiency: number;
-  reactorType: 'pressurized-water' | 'fast-breeder' | 'fusion';
+  reactorType: 'pressurized-water' | 'fast-breeder' | 'fusion' | 'thorium-msr';
   isStable: boolean;
   warningLevel: 'none' | 'low' | 'medium' | 'high';
+  emergencyDrainActive?: boolean;
 }
 
 const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
@@ -25,7 +26,8 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
   efficiency,
   reactorType,
   isStable,
-  warningLevel
+  warningLevel,
+  emergencyDrainActive = false
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -60,7 +62,7 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
     };
     
     animate();
-  }, [temperature, coolantFlow, controlRodLevel, isRunning, coolantType, reactorType, isStable, warningLevel]);
+  }, [temperature, coolantFlow, controlRodLevel, isRunning, coolantType, reactorType, isStable, warningLevel, emergencyDrainActive]);
   
   const drawReactor = (
     ctx: CanvasRenderingContext2D, 
@@ -79,7 +81,14 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
     // Reactor vessel
     ctx.beginPath();
     ctx.rect(reactorVesselX, reactorVesselY, reactorVesselWidth, reactorVesselHeight);
-    ctx.fillStyle = '#444';
+    
+    // Different vessel color for thorium MSR
+    if (reactorType === 'thorium-msr') {
+      ctx.fillStyle = '#505050'; // Darker gray for MSR vessel
+    } else {
+      ctx.fillStyle = '#444'; // Regular vessel color
+    }
+    
     ctx.fill();
     ctx.strokeStyle = '#222';
     ctx.lineWidth = 4;
@@ -94,18 +103,35 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
     ctx.beginPath();
     ctx.rect(coreX, coreY, coreWidth, coreHeight);
     
-    // Core color based on temperature
+    // Core color based on temperature and reactor type
     let coreColor;
-    if (temperature > 1500) {
-      coreColor = '#ff4500'; // Very hot - red-orange
-    } else if (temperature > 1000) {
-      coreColor = '#ff8c00'; // Hot - dark orange
-    } else if (temperature > 500) {
-      coreColor = '#ffa500'; // Warm - orange
-    } else if (temperature > 100) {
-      coreColor = '#ffcc00'; // Low heat - yellow
+    
+    if (reactorType === 'thorium-msr') {
+      // Orange glowing color for thorium MSR
+      if (temperature > 1500) {
+        coreColor = '#ff3300'; // Very hot - bright orange-red
+      } else if (temperature > 1000) {
+        coreColor = '#ff6600'; // Hot - orange
+      } else if (temperature > 500) {
+        coreColor = '#ff9933'; // Warm - light orange
+      } else if (temperature > 100) {
+        coreColor = '#ffcc66'; // Low heat - pale orange
+      } else {
+        coreColor = '#ffddaa'; // Cold - very pale orange
+      }
     } else {
-      coreColor = '#aaa'; // Cold - gray
+      // Regular reactor colors
+      if (temperature > 1500) {
+        coreColor = '#ff4500'; // Very hot - red-orange
+      } else if (temperature > 1000) {
+        coreColor = '#ff8c00'; // Hot - dark orange
+      } else if (temperature > 500) {
+        coreColor = '#ffa500'; // Warm - orange
+      } else if (temperature > 100) {
+        coreColor = '#ffcc00'; // Low heat - yellow
+      } else {
+        coreColor = '#aaa'; // Cold - gray
+      }
     }
     
     ctx.fillStyle = coreColor;
@@ -133,10 +159,45 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
       ctx.stroke();
     }
     
+    // Thorium MSR specific visualization - fuel spheres
+    if (reactorType === 'thorium-msr' && isRunning) {
+      const numSpheres = 15;
+      for (let i = 0; i < numSpheres; i++) {
+        // Random position within the core
+        const sphereX = coreX + Math.random() * coreWidth;
+        const sphereY = coreY + Math.random() * coreHeight;
+        const sphereSize = 3 + Math.random() * 3;
+        
+        // Draw thorium fuel spheres
+        ctx.beginPath();
+        ctx.arc(sphereX, sphereY, sphereSize, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(70, 200, 80, 0.8)'; // Green for thorium
+        ctx.fill();
+        
+        // Glow effect for active fuel
+        const glowSize = sphereSize * (1.5 + 0.5 * Math.sin(frameCount * 0.05 + i));
+        const gradient = ctx.createRadialGradient(
+          sphereX, sphereY, sphereSize,
+          sphereX, sphereY, glowSize
+        );
+        gradient.addColorStop(0, 'rgba(70, 200, 80, 0.4)');
+        gradient.addColorStop(1, 'rgba(70, 200, 80, 0)');
+        
+        ctx.beginPath();
+        ctx.arc(sphereX, sphereY, glowSize, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+    }
+    
     // Coolant flow visualization
     if (isRunning) {
-      const coolantColor = coolantType === 'water' ? '#3b82f6' : 
-                          coolantType === 'sodium' ? '#f97316' : '#a78bfa';
+      // Different coolant colors based on type
+      const coolantColor = 
+        coolantType === 'water' ? '#3b82f6' : 
+        coolantType === 'sodium' ? '#f97316' : 
+        coolantType === 'molten-salt' ? '#ff9933' : // Orange for molten salt
+        '#a78bfa'; // Helium is purple
                           
       const numParticles = coolantFlow / 5; // 0-20 particles based on flow
       
@@ -192,6 +253,62 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
       ctx.strokeStyle = '#666';
       ctx.lineWidth = 10;
       ctx.stroke();
+      
+      // For Thorium MSR - draw emergency drain system if active
+      if (reactorType === 'thorium-msr') {
+        // Draw drain pipe at the bottom
+        const drainY = reactorVesselY + reactorVesselHeight;
+        const drainX = centerX;
+        
+        ctx.beginPath();
+        ctx.moveTo(drainX, coreY + coreHeight);
+        ctx.lineTo(drainX, drainY + 20);
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 8;
+        ctx.stroke();
+        
+        // Draw drain valve (closed by default)
+        ctx.beginPath();
+        ctx.arc(drainX, drainY, 6, 0, Math.PI * 2);
+        
+        if (emergencyDrainActive) {
+          ctx.fillStyle = '#22c55e'; // Green when open
+          
+          // Draw flowing salt if emergency drain is active
+          for (let i = 0; i < 10; i++) {
+            const saltY = coreY + coreHeight + ((frameCount * 3 + i * 8) % 40);
+            
+            if (saltY < drainY + 20) {
+              ctx.beginPath();
+              ctx.arc(drainX, saltY, 3, 0, Math.PI * 2);
+              ctx.fillStyle = coolantColor;
+              ctx.fill();
+            }
+          }
+          
+          // Draw collection tank
+          ctx.beginPath();
+          ctx.rect(drainX - 25, drainY + 20, 50, 15);
+          ctx.fillStyle = '#555';
+          ctx.fill();
+          ctx.strokeStyle = '#333';
+          ctx.stroke();
+          
+          // Draw collected salt in tank
+          ctx.beginPath();
+          ctx.rect(drainX - 23, drainY + 22, 46, 11);
+          ctx.fillStyle = coolantColor;
+          ctx.fill();
+          
+        } else {
+          ctx.fillStyle = '#ef4444'; // Red when closed
+        }
+        
+        ctx.fill();
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     }
     
     // Enhanced fusion visualization for kids
@@ -340,7 +457,13 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
         
         ctx.beginPath();
         ctx.arc(particleX, particleY, 2, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffff00';
+        
+        // Different energy colors for thorium
+        if (reactorType === 'thorium-msr') {
+          ctx.fillStyle = '#ffcc00'; // Yellow-orange for thorium energy
+        } else {
+          ctx.fillStyle = '#ffff00'; // Yellow for standard energy
+        }
         ctx.fill();
         
         // Add energy rays
@@ -352,7 +475,12 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
           ctx.beginPath();
           ctx.moveTo(particleX, particleY);
           ctx.lineTo(rayEndX, rayEndY);
-          ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
+          
+          if (reactorType === 'thorium-msr') {
+            ctx.strokeStyle = 'rgba(255, 204, 0, 0.7)'; // Yellow-orange for thorium
+          } else {
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow for standard
+          }
           ctx.lineWidth = 1;
           ctx.stroke();
         }
@@ -384,6 +512,34 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
       }
     }
     
+    // Special effect for Thorium MSR passive safety feature
+    if (reactorType === 'thorium-msr' && temperature > 900 && temperature < 1400 && isRunning) {
+      // Safety glow effect around core
+      const safetyRadius = coreWidth * 0.6;
+      const safetyGlow = ctx.createRadialGradient(
+        centerX, centerY, coreWidth * 0.3,
+        centerX, centerY, safetyRadius
+      );
+      
+      safetyGlow.addColorStop(0, 'rgba(40, 180, 60, 0)');
+      safetyGlow.addColorStop(0.5, `rgba(40, 180, 60, ${0.1 + 0.1 * Math.sin(frameCount * 0.1)})`);
+      safetyGlow.addColorStop(1, 'rgba(40, 180, 60, 0)');
+      
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, safetyRadius, 0, Math.PI * 2);
+      ctx.fillStyle = safetyGlow;
+      ctx.fill();
+      
+      // Pulsing text for educational value
+      if (frameCount % 90 < 45) {
+        ctx.font = '12px Arial';
+        ctx.fillStyle = 'rgba(40, 180, 60, 0.8)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Selbstregulierung aktiv', centerX, reactorVesselY + reactorVesselHeight + 30);
+      }
+    }
+    
     // Label for reactor type
     ctx.font = '14px Arial';
     ctx.fillStyle = 'white';
@@ -391,17 +547,21 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
     ctx.textBaseline = 'top';
     
     const reactorLabel = reactorType === 'pressurized-water' ? 'Druckwasserreaktor' :
-                        reactorType === 'fast-breeder' ? 'Schneller Brüter' : 'Fusionsreaktor';
+                        reactorType === 'fast-breeder' ? 'Schneller Brüter' : 
+                        reactorType === 'fusion' ? 'Fusionsreaktor' :
+                        'Thorium-Flüssigsalzreaktor';
     
     ctx.fillText(reactorLabel, centerX, reactorVesselY + reactorVesselHeight + 10);
     
     // Status indicator
     const statusText = !isRunning ? 'Inaktiv' : 
                       !isStable ? 'KRITISCH!' : 
+                      emergencyDrainActive ? 'Notablauf!' :
                       efficiency > 30 ? 'Optimale Leistung' : 'Stabil';
     
     const statusColor = !isRunning ? '#aaa' : 
                        !isStable ? '#ff0000' : 
+                       emergencyDrainActive ? '#ff9900' :
                        efficiency > 30 ? '#00ff00' : '#ffcc00';
     
     ctx.fillStyle = statusColor;
@@ -420,3 +580,4 @@ const ReactorVisualizer: React.FC<ReactorVisualizerProps> = ({
 };
 
 export default ReactorVisualizer;
+

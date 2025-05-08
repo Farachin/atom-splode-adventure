@@ -6,7 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Thermometer, Droplets, Zap, Fan, Atom, AlertTriangle } from 'lucide-react';
+import { Thermometer, Droplets, Zap, Fan, Atom, AlertTriangle, Flask, Beaker } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ReactorVisualizer from './ReactorVisualizer';
@@ -17,8 +17,8 @@ interface ReactorLabProps {
   className?: string;
 }
 
-type ReactorType = 'pressurized-water' | 'fast-breeder' | 'fusion';
-type CoolantType = 'water' | 'sodium' | 'helium';
+type ReactorType = 'pressurized-water' | 'fast-breeder' | 'fusion' | 'thorium-msr';
+type CoolantType = 'water' | 'sodium' | 'helium' | 'molten-salt';
 
 const MAX_TEMPERATURE = 2000; // degrees C
 const MELTDOWN_TEMPERATURE = 1800; // degrees C
@@ -26,6 +26,7 @@ const OPTIMAL_TEMPERATURE = {
   'pressurized-water': 330, // degrees C
   'fast-breeder': 550, // degrees C
   'fusion': 150000000, // degrees C (fusion plasma)
+  'thorium-msr': 700, // degrees C (molten salt)
 };
 
 const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, className }) => {
@@ -39,6 +40,8 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
   const [efficiency, setEfficiency] = useState<number>(0);
   const [isStable, setIsStable] = useState<boolean>(true);
   const [warningLevel, setWarningLevel] = useState<'none' | 'low' | 'medium' | 'high'>('none');
+  const [showSafetyFeature, setShowSafetyFeature] = useState<boolean>(false);
+  const [emergencyDrainActive, setEmergencyDrainActive] = useState<boolean>(false);
   const { toast } = useToast();
 
   // Effects for reactor simulation
@@ -60,6 +63,42 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
         } else {
           heatGeneration = (100 - controlRodLevel) * 30; // Max 3000 heat units when plasma is hot
         }
+      } else if (reactorType === 'thorium-msr') {
+        // Thorium MSR heat generation - increases with temperature up to a point, then decreases (passive safety)
+        const normalizedTemp = Math.min(1, temperature / 900); // Peak efficiency around 900°C
+        const safetyFactor = temperature > 900 ? Math.max(0.1, 1 - (temperature - 900) / 500) : 1;
+        heatGeneration = (100 - controlRodLevel) * 12 * normalizedTemp * safetyFactor;
+        
+        // Safety feature for thorium MSR - as temperature rises beyond optimal, reaction slows down
+        if (temperature > 900 && !showSafetyFeature && Math.random() > 0.8) {
+          setShowSafetyFeature(true);
+          toast({
+            title: "Tolle Sicherheit!",
+            description: "Der Thoriumreaktor verlangsamt die Reaktion automatisch, wenn er zu heiß wird!",
+          });
+          
+          // Hide safety message after a while
+          setTimeout(() => {
+            setShowSafetyFeature(false);
+          }, 5000);
+        }
+        
+        // Emergency drain for MSR - if temperature gets dangerously high
+        if (temperature > 1400 && !emergencyDrainActive) {
+          setEmergencyDrainActive(true);
+          toast({
+            title: "Notablauf aktiviert!",
+            description: "Das heiße Salz fließt in den Sicherheitsbehälter und stoppt die Reaktion!",
+            variant: "default",
+          });
+          
+          // Stop reactor after a short delay to simulate drain
+          setTimeout(() => {
+            setIsRunning(false);
+            setEmergencyDrainActive(false);
+            setTemperature(prev => Math.max(400, prev - 400)); // Cool down but still hot
+          }, 2000);
+        }
       }
 
       // Calculate cooling effect based on coolant type and flow
@@ -71,6 +110,8 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
         coolingEffect = coolantFlow * 12; // Max 1200 cooling units
       } else if (coolantType === 'helium') {
         coolingEffect = coolantFlow * 5; // Max 500 cooling units
+      } else if (coolantType === 'molten-salt') {
+        coolingEffect = coolantFlow * 10; // Max 1000 cooling units
       }
 
       // Calculate new temperature
@@ -86,18 +127,31 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning, reactorType, coolantType, controlRodLevel, coolantFlow, temperature]);
+  }, [isRunning, reactorType, coolantType, controlRodLevel, coolantFlow, temperature, showSafetyFeature, emergencyDrainActive]);
 
   // Check reactor stability based on temperature
   const checkReactorStability = (temp: number) => {
-    if (temp >= MELTDOWN_TEMPERATURE) {
+    // Thorium MSR can't have a traditional meltdown, but can still overheat
+    const meltdownThreshold = reactorType === 'thorium-msr' ? MELTDOWN_TEMPERATURE * 1.1 : MELTDOWN_TEMPERATURE;
+    
+    if (temp >= meltdownThreshold) {
       setIsStable(false);
       setIsRunning(false);
-      toast({
-        title: "Reaktor Kernschmelze!",
-        description: "Die Temperatur ist zu hoch gestiegen. Der Reaktor ist geschmolzen!",
-        variant: "destructive",
-      });
+      
+      // Different messages for different reactor types
+      if (reactorType === 'thorium-msr') {
+        toast({
+          title: "Reaktor überhitzt!",
+          description: "Das Flüssigsalz ist zu heiß geworden und hat die Rohre beschädigt. Der Reaktor wurde gestoppt.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Reaktor Kernschmelze!",
+          description: "Die Temperatur ist zu hoch gestiegen. Der Reaktor ist geschmolzen!",
+          variant: "destructive",
+        });
+      }
       return;
     }
 
@@ -145,6 +199,24 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
         eff = 0;
         output = 0;
       }
+    } else if (reactorType === 'thorium-msr') {
+      // Thorium MSR operates at high temperature with good efficiency
+      const tempRatio = Math.min(1, temp / optimalTemp);
+      
+      // Efficiency curve - peaks at optimal then falls off if too hot
+      if (temp < optimalTemp) {
+        eff = tempRatio * 0.45; // Ramp up to 45% max efficiency
+      } else {
+        // Gradually decrease efficiency if too hot, but still decent
+        eff = Math.max(0.1, 0.45 * (1 - (temp - optimalTemp) / 800));
+      }
+      
+      output = eff * temp * 0.6;
+      
+      // Emergency drain causes output to drop
+      if (emergencyDrainActive) {
+        output *= 0.3; // Rapidly decreasing output
+      }
     }
 
     setEfficiency(eff * 100); // Convert to percentage
@@ -179,6 +251,7 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
     setWarningLevel('none');
     setEnergyOutput(0);
     setEfficiency(0);
+    setEmergencyDrainActive(false);
     toast({
       title: "Reaktor zurückgesetzt",
       description: "Der Reaktor wurde neu aufgebaut und ist bereit für den Start.",
@@ -191,6 +264,7 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
       case 'pressurized-water': return 'Druckwasserreaktor';
       case 'fast-breeder': return 'Schneller Brüter';
       case 'fusion': return 'Fusionsreaktor';
+      case 'thorium-msr': return 'Thorium-Flüssigsalzreaktor';
       default: return '';
     }
   };
@@ -201,6 +275,7 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
       case 'water': return 'Wasser';
       case 'sodium': return 'Flüssiges Natrium';
       case 'helium': return 'Helium-Gas';
+      case 'molten-salt': return 'Flüssigsalz';
       default: return '';
     }
   };
@@ -254,6 +329,7 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
               isStable={isStable}
               warningLevel={warningLevel}
               className="h-64 mb-4"
+              emergencyDrainActive={emergencyDrainActive}
             />
             
             <div className="grid grid-cols-2 gap-4">
@@ -276,6 +352,12 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
                   <div className="flex items-center mt-2 text-red-500 text-sm">
                     <AlertTriangle className="h-4 w-4 mr-1" />
                     <span>Kritisch! Kühlung erhöhen!</span>
+                  </div>
+                )}
+                {reactorType === 'thorium-msr' && showSafetyFeature && (
+                  <div className="flex items-center mt-2 text-green-500 text-sm animate-pulse">
+                    <div className="h-2 w-2 rounded-full bg-green-500 mr-2"></div>
+                    <span>Sicherheitssystem aktiv!</span>
                   </div>
                 )}
               </div>
@@ -334,7 +416,7 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
               </TabsList>
               
               <TabsContent value="reactor-type" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <Button 
                     className={cn(
                       "h-24 flex-col items-center justify-center space-y-2 text-left",
@@ -391,6 +473,25 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
                     </div>
                     <p className="text-xs text-gray-500">Sehr hohe Effizienz, schwer zu starten</p>
                   </Button>
+
+                  <Button 
+                    className={cn(
+                      "h-24 flex-col items-center justify-center space-y-2 text-left",
+                      reactorType === 'thorium-msr' ? "border-4 border-primary" : "border"
+                    )}
+                    variant="outline"
+                    onClick={() => {
+                      setReactorType('thorium-msr');
+                      setCoolantType('molten-salt');
+                    }}
+                    disabled={isRunning}
+                  >
+                    <div className="flex items-center">
+                      <Flask className="h-5 w-5 mr-2 text-orange-400" />
+                      <span className="font-bold">Thoriumreaktor</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Flüssigsalz, sicherer, weniger Müll</p>
+                  </Button>
                 </div>
                 
                 <div className="bg-blue-50 rounded-lg p-4 text-sm">
@@ -407,20 +508,46 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
                     <p>Verschmilzt Wasserstoffisotope zu Helium, ähnlich wie in der Sonne. 
                       Benötigt extrem hohe Temperaturen und starke Magnetfelder, produziert aber viel Energie.</p>
                   )}
+                  {reactorType === 'thorium-msr' && (
+                    <p>Thorium ist ein besonderes Metall aus dem Boden. Es macht Energie, aber ganz anders als Uran! 
+                      Der Reaktor verwendet Flüssigsalz statt Wasser und wird bei niedrigerem Druck betrieben. 
+                      Er stoppt automatisch, wenn er zu heiß wird!</p>
+                  )}
                 </div>
+
+                {reactorType === 'thorium-msr' && (
+                  <div className="bg-orange-50 border border-orange-100 rounded-lg p-4 text-sm relative overflow-hidden">
+                    <div className="flex space-x-2 items-center mb-3">
+                      <div className="w-4 h-4 rounded-full bg-orange-300 animate-pulse"></div>
+                      <h3 className="font-medium text-orange-700">Der Thorium-Flüssigsalzreaktor</h3>
+                    </div>
+                    
+                    <ul className="list-disc list-inside space-y-2 text-sm">
+                      <li><span className="font-medium">Sicherer:</span> Wenn's zu heiß wird, stoppt der Reaktor von selbst!</li>
+                      <li><span className="font-medium">Kein Hochdruck:</span> Weil wir Salz statt Wasser benutzen, kann es nicht explodieren!</li>
+                      <li><span className="font-medium">Weniger Müll:</span> Macht viel weniger radioaktiven Abfall als normale Reaktoren.</li>
+                      <li><span className="font-medium">Notablauf:</span> Bei Problemen fließt das Salz in einen sicheren Behälter.</li>
+                    </ul>
+                    
+                    <div className="mt-3 flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                      <span className="text-xs text-green-700">Wissenschaftler sagen: Vielleicht der Reaktor der Zukunft!</span>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
               
               <TabsContent value="cooling" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-{reactorType === 'thorium-msr' ? '4' : '3'} gap-4">
                   <Button 
                     className={cn(
                       "h-24 flex-col items-center justify-center space-y-2 text-left",
                       coolantType === 'water' ? "border-4 border-primary" : "border",
-                      reactorType === 'fusion' ? "opacity-50" : ""
+                      (reactorType === 'fusion' || reactorType === 'thorium-msr') ? "opacity-50" : ""
                     )}
                     variant="outline"
-                    onClick={() => reactorType !== 'fusion' && setCoolantType('water')}
-                    disabled={reactorType === 'fusion' || isRunning}
+                    onClick={() => (reactorType !== 'fusion' && reactorType !== 'thorium-msr') && setCoolantType('water')}
+                    disabled={reactorType === 'fusion' || reactorType === 'thorium-msr' || isRunning}
                   >
                     <div className="flex items-center">
                       <Droplets className="h-5 w-5 mr-2 text-blue-500" />
@@ -433,11 +560,11 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
                     className={cn(
                       "h-24 flex-col items-center justify-center space-y-2 text-left",
                       coolantType === 'sodium' ? "border-4 border-primary" : "border",
-                      reactorType === 'fusion' ? "opacity-50" : ""
+                      (reactorType === 'fusion' || reactorType === 'thorium-msr') ? "opacity-50" : ""
                     )}
                     variant="outline"
-                    onClick={() => reactorType !== 'fusion' && setCoolantType('sodium')}
-                    disabled={reactorType === 'fusion' || isRunning}
+                    onClick={() => (reactorType !== 'fusion' && reactorType !== 'thorium-msr') && setCoolantType('sodium')}
+                    disabled={reactorType === 'fusion' || reactorType === 'thorium-msr' || isRunning}
                   >
                     <div className="flex items-center">
                       <Thermometer className="h-5 w-5 mr-2 text-orange-500" />
@@ -449,17 +576,35 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
                   <Button 
                     className={cn(
                       "h-24 flex-col items-center justify-center space-y-2 text-left",
-                      coolantType === 'helium' ? "border-4 border-primary" : "border"
+                      coolantType === 'helium' ? "border-4 border-primary" : "border",
+                      reactorType === 'thorium-msr' ? "opacity-50" : ""
                     )}
                     variant="outline"
-                    onClick={() => setCoolantType('helium')}
-                    disabled={isRunning}
+                    onClick={() => reactorType !== 'thorium-msr' && setCoolantType('helium')}
+                    disabled={reactorType === 'thorium-msr' || isRunning}
                   >
                     <div className="flex items-center">
                       <Fan className="h-5 w-5 mr-2 text-purple-500" />
                       <span className="font-bold">Helium-Gas</span>
                     </div>
                     <p className="text-xs text-gray-500">Für Hochtemperatur-Reaktoren, weniger effizient</p>
+                  </Button>
+
+                  <Button 
+                    className={cn(
+                      "h-24 flex-col items-center justify-center space-y-2 text-left",
+                      coolantType === 'molten-salt' ? "border-4 border-primary" : "border",
+                      reactorType !== 'thorium-msr' ? "opacity-50" : ""
+                    )}
+                    variant="outline"
+                    onClick={() => reactorType === 'thorium-msr' && setCoolantType('molten-salt')}
+                    disabled={reactorType !== 'thorium-msr' || isRunning}
+                  >
+                    <div className="flex items-center">
+                      <Beaker className="h-5 w-5 mr-2 text-orange-400" />
+                      <span className="font-bold">Flüssigsalz</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Für Thoriumreaktor, wird sehr heiß, verdampft nicht</p>
                   </Button>
                 </div>
                 
@@ -492,7 +637,32 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
                       <p>Helium ist chemisch inert und eignet sich für Hochtemperaturreaktoren. 
                         Es hat jedoch eine geringere Wärmekapazität als Flüssigkeiten.</p>
                     )}
+                    {coolantType === 'molten-salt' && (
+                      <p>Flüssigsalz wird sehr heiß (700-800°C), ohne zu verdampfen. Es kann den Brennstoff direkt aufnehmen 
+                      und leitet Wärme sehr gut. Bei Problemen kann das Salz einfach in einen sicheren Behälter abgelassen werden.</p>
+                    )}
                   </div>
+
+                  {coolantType === 'molten-salt' && (
+                    <div className="relative p-4 rounded-lg bg-orange-50 border border-orange-200">
+                      <div className="flex items-center mb-2">
+                        <Beaker className="h-5 w-5 mr-2 text-orange-500" />
+                        <span className="font-medium">Wie funktioniert ein Flüssigsalzreaktor?</span>
+                      </div>
+
+                      <div className="space-y-2 text-sm">
+                        <p>1. Thorium wird im heißen Flüssigsalz gelöst (statt feste Brennstäbe)</p>
+                        <p>2. Neutronen treffen auf Thorium-232 und es wird zu Uran-233</p>
+                        <p>3. Uran-233 spaltet sich und macht Energie, das Salz wird heiß</p>
+                        <p>4. Das heiße Salz fließt durch Rohre zum Wärmetauscher</p>
+                        <p>5. Bei Problemen: Salz fließt in Sicherheitsbehälter - Stopp!</p>
+                      </div>
+
+                      <div className="absolute -right-2 -bottom-2 opacity-20">
+                        <Flask className="h-16 w-16 text-orange-300" />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
               
@@ -520,6 +690,39 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
                     <p>Steuerstäbe absorbieren Neutronen und verlangsamen so die Kettenreaktion. 
                       Tiefer eingetauchte Stäbe (höherer Wert) reduzieren die Reaktionsrate und Wärmeerzeugung.</p>
                   </div>
+
+                  {reactorType === 'thorium-msr' && (
+                    <div className="bg-green-50 rounded-lg p-4 text-sm border border-green-100">
+                      <h3 className="font-medium mb-2 text-green-700">Vergleich: Uran vs. Thorium</h3>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-3 bg-white rounded border border-red-100">
+                          <div className="font-medium text-red-700 mb-1">Uranreaktor:</div>
+                          <ul className="list-disc list-inside text-xs space-y-1">
+                            <li>Viel radioaktiver Müll</li>
+                            <li>Kann überhitzen und schmelzen</li>
+                            <li>Benötigt hohen Druck</li>
+                            <li>Braucht viel Notfallschutz</li>
+                          </ul>
+                        </div>
+                        
+                        <div className="p-3 bg-white rounded border border-green-100">
+                          <div className="font-medium text-green-700 mb-1">Thoriumreaktor:</div>
+                          <ul className="list-disc list-inside text-xs space-y-1">
+                            <li>Weniger radioaktiver Müll</li>
+                            <li>Stoppt automatisch bei Überhitzung</li>
+                            <li>Niedriger Druck, keine Explosion</li>
+                            <li>Hat eingebaute Sicherheitsfeatures</li>
+                          </ul>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 text-xs text-center text-green-700 font-medium">
+                        Thoriumreaktoren machen viel Energie und fast keinen Müll. Die Wissenschaftler denken: 
+                        Vielleicht ist das der Reaktor der Zukunft!
+                      </div>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>
@@ -531,3 +734,4 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
 };
 
 export default ReactorLab;
+
