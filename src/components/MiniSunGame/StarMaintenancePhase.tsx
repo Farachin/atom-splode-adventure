@@ -10,7 +10,7 @@ interface StarMaintenancePhaseProps {
   temperature: number;
   stability: number;
   fuel: number;
-  starType: 'none' | 'red-dwarf' | 'main-sequence' | 'blue-giant' | 'neutron';
+  starType: 'none' | 'red-dwarf' | 'main-sequence' | 'blue-giant' | 'neutron' | 'black-hole';
   starSize: number;
   onTemperatureChange: (temp: number) => void;
   onStabilityChange: (stability: number) => void;

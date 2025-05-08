@@ -113,7 +113,7 @@ const BlackHolePhase: React.FC<BlackHolePhaseProps> = ({
             
             // Slowly increase black hole size when matter is consumed
             if (Math.random() < 0.05) {
-              setBlackHoleSize(prev => prev + 0.01);
+              setBlackHoleSize(blackHoleSize + 0.01);
               setAddedMass(prev => prev + 0.1);
             }
             
