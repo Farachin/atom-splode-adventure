@@ -658,7 +658,7 @@ const ReactorLab: React.FC<ReactorLabProps> = ({ energy, onEnergyProduced, class
                       </div>
 
                       <div className="absolute -right-2 -bottom-2 opacity-20">
-                        <Flask className="h-16 w-16 text-orange-300" />
+                        <Beaker className="h-16 w-16 text-orange-300" />
                       </div>
                     </div>
                   )}
