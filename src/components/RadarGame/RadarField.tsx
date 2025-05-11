@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { JetType } from './RadarGame';
@@ -126,19 +125,24 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     setShowStartScreen(false);
     setIsPlaying(true);
     
-    // Kurze Verzögerung, um die Animation anzuzeigen
-    setTimeout(() => {
-      startGameLoop();
-      toast({
-        title: "Los geht's!",
-        description: "Steuere deinen Jet mit den Pfeiltasten oder durch Klicken/Tippen.",
-      });
-    }, 500);
+    // Set initial jet position to start position
+    setPlayerPosition({ x: 10, y: 50 });
+    
+    // Start the game loop immediately
+    startGameLoop();
+    
+    toast({
+      title: "Los geht's!",
+      description: "Steuere deinen Jet mit den Pfeiltasten oder durch Klicken/Tippen.",
+    });
   };
   
   // Spielloop
   const startGameLoop = () => {
-    if (gameLoopRef.current) return;
+    if (gameLoopRef.current) {
+      cancelAnimationFrame(gameLoopRef.current);
+      gameLoopRef.current = null;
+    }
     
     let lastTime = performance.now();
     
@@ -180,10 +184,10 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
         });
       }
       
-      // Jet Bewegung durch Trägheit
+      // FIXED: Improve jet movement with thrust
       if (jetThrust > 0) {
-        moveInDirection(playerRotation, jetThrust * deltaTime / 100);
-        setJetThrust((prev) => Math.max(0, prev - deltaTime / 500));
+        moveInDirection(playerRotation, jetThrust * deltaTime / 50); // Increased movement speed
+        setJetThrust((prev) => Math.max(0, prev - deltaTime / 1000)); // Slower decay for thrust
       }
       
       gameLoopRef.current = requestAnimationFrame(loop);
@@ -396,7 +400,7 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
       }
     }
     
-    // Aktualisiere die Spielerposition
+    // FIXED: Actually update the player position
     setPlayerPosition({ x: boundedX, y: boundedY });
   };
   
@@ -416,9 +420,9 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     // Setze die Richtung des Jets
     setPlayerRotation(angle);
     
-    // Erhöhe den Schub
-    const jetSpeedFactor = jetType === 'metal' ? 1.2 : jetType === 'carbon' ? 1.0 : 0.8;
-    setJetThrust(Math.min(3, jetThrust + 1) * jetSpeedFactor);
+    // Erhöhe den Schub - FIXED: Apply more thrust for better movement
+    const jetSpeedFactor = jetType === 'metal' ? 1.5 : jetType === 'carbon' ? 1.2 : 1.0;
+    setJetThrust(Math.min(5, jetThrust + 2) * jetSpeedFactor);
   };
   
   // Tastatursteuerung
@@ -426,27 +430,28 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPlaying) return;
       
-      const jetSpeedFactor = jetType === 'metal' ? 1.2 : jetType === 'carbon' ? 1.0 : 0.8;
+      const jetSpeedFactor = jetType === 'metal' ? 1.5 : jetType === 'carbon' ? 1.2 : 1.0;
+      const thrustIncrement = 1.0; // Increased for better movement
       
       switch (e.key) {
         case 'ArrowUp':
           setPlayerRotation(270);
-          setJetThrust(Math.min(3, jetThrust + 0.5) * jetSpeedFactor);
+          setJetThrust(Math.min(5, jetThrust + thrustIncrement) * jetSpeedFactor);
           break;
         case 'ArrowDown':
           setPlayerRotation(90);
-          setJetThrust(Math.min(3, jetThrust + 0.5) * jetSpeedFactor);
+          setJetThrust(Math.min(5, jetThrust + thrustIncrement) * jetSpeedFactor);
           break;
         case 'ArrowLeft':
           setPlayerRotation(180);
-          setJetThrust(Math.min(3, jetThrust + 0.5) * jetSpeedFactor);
+          setJetThrust(Math.min(5, jetThrust + thrustIncrement) * jetSpeedFactor);
           break;
         case 'ArrowRight':
           setPlayerRotation(0);
-          setJetThrust(Math.min(3, jetThrust + 0.5) * jetSpeedFactor);
+          setJetThrust(Math.min(5, jetThrust + thrustIncrement) * jetSpeedFactor);
           break;
         case ' ': // Leertaste für Boost
-          setJetThrust(Math.min(3, jetThrust + 1) * jetSpeedFactor);
+          setJetThrust(Math.min(5, jetThrust + 2) * jetSpeedFactor);
           break;
       }
     };
@@ -569,16 +574,18 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
             </div>
             
             {/* Radar-Strahl */}
+            {/* FIXED: Improved radar beam visibility */}
             <div 
-              className="absolute h-full w-2 bg-red-500 opacity-60 animate-pulse"
+              className="absolute h-full w-3 bg-red-500 opacity-70"
               style={{ left: `${radarPosition.x}%` }}
             ></div>
             
             {/* Radar-Wellen - mehrere für bessere Sichtbarkeit */}
+            {/* FIXED: Improved radar wave visibility */}
             {[1, 2, 3].map((i) => (
               <div 
                 key={i}
-                className="absolute rounded-full border-2 border-red-500 opacity-30"
+                className="absolute rounded-full border-2 border-red-500 opacity-50"
                 style={{ 
                   left: `${radarPosition.x}%`, 
                   top: `${radarPosition.y}%`,
@@ -638,8 +645,8 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
             {/* Spieler-Jet - verbesserte Version mit besseren visuellen Effekten */}
             <div 
               className={cn(
-                "absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-200",
-                radarDetection && "ring-2 ring-red-500 ring-opacity-80"
+                "absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-100",
+                radarDetection && "ring-4 ring-red-500 ring-opacity-80"
               )}
               style={{ 
                 left: `${playerPosition.x}%`, 
@@ -661,32 +668,32 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
                   strokeWidth={1}
                 />
                 
-                {/* Schub-Effekt */}
+                {/* Enhanced thrust effect */}
                 {jetThrust > 0 && (
                   <div
                     className={cn(
                       "absolute top-1/2 right-0 -translate-y-1/2 rotate-180",
-                      "h-2 rounded-full",
-                      jetThrust > 2 ? "bg-red-500" : jetThrust > 1 ? "bg-orange-400" : "bg-yellow-300"
+                      "h-3 rounded-full",
+                      jetThrust > 3 ? "bg-red-500" : jetThrust > 1.5 ? "bg-orange-400" : "bg-yellow-300"
                     )}
                     style={{ 
-                      width: `${10 + jetThrust * 8}px`,
-                      opacity: 0.8
+                      width: `${15 + jetThrust * 10}px`,
+                      opacity: 0.9
                     }}
                   ></div>
                 )}
                 
-                {/* Bewegungs-Indikator */}
+                {/* Enhanced movement indicator */}
                 {jetThrust > 0.5 && (
-                  <div className="absolute -inset-1 border border-white opacity-30 rounded-full animate-ping"></div>
+                  <div className="absolute -inset-2 border-2 border-white opacity-40 rounded-full animate-ping"></div>
                 )}
               </div>
             </div>
             
             {/* Klick-Hinweis */}
             {isPlaying && (
-              <div className="absolute bottom-2 right-2 text-xs bg-white bg-opacity-70 p-1 rounded">
-                Klicke/tippe, um zu fliegen!
+              <div className="absolute bottom-2 right-2 text-sm bg-white bg-opacity-80 p-2 rounded font-medium">
+                Klicke/tippe, um zu fliegen! Oder nutze die Pfeiltasten.
               </div>
             )}
           </div>
