@@ -42,6 +42,8 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
   const [jetThrust, setJetThrust] = useState(0);
   const [targetPosition, setTargetPosition] = useState<Position | null>(null);
   const { toast } = useToast();
+  const [waveRadius, setWaveRadius] = useState(30);
+  const [showStartScreen, setShowStartScreen] = useState(true);
   
   // Initialisiere das Spielfeld
   useEffect(() => {
@@ -119,21 +121,27 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     setObstacles(generatedObstacles);
   }, []);
   
-  // Starte das Spiel
+  // Starte das Spiel automatisch nach dem Klicken auf Start
   const handleStartGame = () => {
+    setShowStartScreen(false);
     setIsPlaying(true);
-    startGameLoop();
-    toast({
-      title: "Los geht's!",
-      description: "Steuere deinen Jet mit den Pfeiltasten oder durch Klicken/Tippen.",
-    });
+    
+    // Kurze Verzögerung, um die Animation anzuzeigen
+    setTimeout(() => {
+      startGameLoop();
+      toast({
+        title: "Los geht's!",
+        description: "Steuere deinen Jet mit den Pfeiltasten oder durch Klicken/Tippen.",
+      });
+    }, 500);
   };
   
   // Spielloop
   const startGameLoop = () => {
     if (gameLoopRef.current) return;
     
-    let lastTime = 0;
+    let lastTime = performance.now();
+    
     const loop = (time: number) => {
       if (!isPlaying) return;
       
@@ -142,6 +150,9 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
       
       // Bewege den Radar
       moveRadar(deltaTime);
+      
+      // Animiere die Radarwellen
+      animateRadarWaves(deltaTime);
       
       // Überprüfe, ob der Radar den Spieler erkennt
       checkRadarDetection();
@@ -179,6 +190,14 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     };
     
     gameLoopRef.current = requestAnimationFrame(loop);
+  };
+  
+  // Animiere die Radarwellen
+  const animateRadarWaves = (deltaTime: number) => {
+    setWaveRadius((prev) => {
+      const newRadius = prev + deltaTime / 50;
+      return newRadius > 80 ? 30 : newRadius;
+    });
   };
   
   // Bewege den Radar
@@ -377,6 +396,7 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
       }
     }
     
+    // Aktualisiere die Spielerposition
     setPlayerPosition({ x: boundedX, y: boundedY });
   };
   
@@ -446,7 +466,7 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
   
   return (
     <div className="space-y-6">
-      {!isPlaying ? (
+      {showStartScreen ? (
         <div className="text-center space-y-6">
           <RadarRobot speaking={true} className="mx-auto" />
           
@@ -485,7 +505,7 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
           <Button 
             onClick={handleStartGame}
             size="lg"
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-blue-600 hover:bg-blue-700 animate-pulse"
           >
             Starte das Rennen!
           </Button>
@@ -540,29 +560,34 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
           
           <div 
             ref={fieldRef}
-            className="relative w-full h-80 bg-blue-100 rounded-xl border-2 border-blue-200 overflow-hidden"
+            className="relative w-full h-80 bg-blue-100 rounded-xl border-2 border-blue-200 overflow-hidden cursor-crosshair"
             onClick={handleFieldClick}
           >
             {/* Radar-Station */}
             <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10">
-              <Radar className="w-10 h-10 text-red-500" />
+              <Radar className="w-10 h-10 text-red-500 animate-pulse" />
             </div>
             
             {/* Radar-Strahl */}
             <div 
-              className="absolute h-full w-2 bg-red-500 opacity-40"
+              className="absolute h-full w-2 bg-red-500 opacity-60 animate-pulse"
               style={{ left: `${radarPosition.x}%` }}
             ></div>
             
-            {/* Radar-Wellen */}
-            <div 
-              className="absolute w-40 h-40 rounded-full border-2 border-red-500 opacity-30"
-              style={{ 
-                left: `${radarPosition.x}%`, 
-                top: `${radarPosition.y}%`,
-                transform: 'translate(-50%, -50%)'
-              }}
-            ></div>
+            {/* Radar-Wellen - mehrere für bessere Sichtbarkeit */}
+            {[1, 2, 3].map((i) => (
+              <div 
+                key={i}
+                className="absolute rounded-full border-2 border-red-500 opacity-30"
+                style={{ 
+                  left: `${radarPosition.x}%`, 
+                  top: `${radarPosition.y}%`,
+                  width: `${waveRadius * i}px`,
+                  height: `${waveRadius * i}px`,
+                  transform: 'translate(-50%, -50%)'
+                }}
+              ></div>
+            ))}
             
             {/* Ziel-Pfeil wenn außerhalb der Sicht */}
             {targetPosition && (
@@ -610,44 +635,66 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
               </div>
             ))}
             
-            {/* Spieler-Jet */}
+            {/* Spieler-Jet - verbesserte Version mit besseren visuellen Effekten */}
             <div 
               className={cn(
-                "absolute w-16 h-8 transform -translate-x-1/2 -translate-y-1/2 transition-transform",
+                "absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-200",
                 radarDetection && "ring-2 ring-red-500 ring-opacity-80"
               )}
               style={{ 
                 left: `${playerPosition.x}%`, 
                 top: `${playerPosition.y}%`,
-                transform: `translate(-50%, -50%) rotate(${playerRotation}deg)`
+                transform: `translate(-50%, -50%) rotate(${playerRotation}deg)`,
+                zIndex: 20
               }}
             >
-              <Plane 
-                className={cn(
-                  "w-full h-full",
-                  jetType === 'metal' && "text-gray-600",
-                  jetType === 'carbon' && "text-gray-800",
-                  jetType === 'stealth' && "text-blue-950"
-                )}
-                fill={jetType === 'metal' ? '#4B5563' : jetType === 'carbon' ? '#1F2937' : '#172554'}
-                strokeWidth={1}
-              />
-              
-              {/* Schub-Effekt */}
-              {jetThrust > 0 && (
-                <div
+              <div className="relative">
+                {/* Jet-Silhouette */}
+                <Plane 
                   className={cn(
-                    "absolute top-1/2 -translate-y-1/2 right-full",
-                    "h-2 rounded-full animate-pulse",
-                    jetThrust > 2 ? "bg-red-500" : jetThrust > 1 ? "bg-orange-400" : "bg-yellow-300"
+                    "w-16 h-16",
+                    jetType === 'metal' && "text-gray-600",
+                    jetType === 'carbon' && "text-gray-800",
+                    jetType === 'stealth' && "text-blue-950"
                   )}
-                  style={{ 
-                    width: `${10 + jetThrust * 5}px`,
-                    opacity: 0.7
-                  }}
-                ></div>
-              )}
+                  fill={jetType === 'metal' ? '#4B5563' : jetType === 'carbon' ? '#1F2937' : '#172554'}
+                  strokeWidth={1}
+                />
+                
+                {/* Schub-Effekt */}
+                {jetThrust > 0 && (
+                  <div
+                    className={cn(
+                      "absolute top-1/2 right-0 -translate-y-1/2 rotate-180",
+                      "h-2 rounded-full",
+                      jetThrust > 2 ? "bg-red-500" : jetThrust > 1 ? "bg-orange-400" : "bg-yellow-300"
+                    )}
+                    style={{ 
+                      width: `${10 + jetThrust * 8}px`,
+                      opacity: 0.8
+                    }}
+                  ></div>
+                )}
+                
+                {/* Bewegungs-Indikator */}
+                {jetThrust > 0.5 && (
+                  <div className="absolute -inset-1 border border-white opacity-30 rounded-full animate-ping"></div>
+                )}
+              </div>
             </div>
+            
+            {/* Klick-Hinweis */}
+            {isPlaying && (
+              <div className="absolute bottom-2 right-2 text-xs bg-white bg-opacity-70 p-1 rounded">
+                Klicke/tippe, um zu fliegen!
+              </div>
+            )}
+          </div>
+          
+          {/* Steuerungshinweise */}
+          <div className="text-sm text-center text-gray-600 bg-blue-50 p-2 rounded-md">
+            Steuere mit den Pfeiltasten oder klicke/tippe, wohin du fliegen willst. 
+            Leertaste für Schub-Boost!
           </div>
         </div>
       )}
