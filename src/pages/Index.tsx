@@ -1,6 +1,8 @@
 
 import React from 'react';
 import Game from '@/components/Game';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   return (
@@ -15,6 +17,14 @@ const Index = () => {
             Experimentiere mit verschiedenen Elementen und sieh, 
             was passiert, wenn du Neutronen auf Atomkerne schießt.
           </p>
+          
+          <div className="flex justify-center gap-4 mt-6">
+            <Link to="/radar-adventure">
+              <Button variant="outline" className="text-blue-600 border-blue-300 hover:bg-blue-50">
+                Radar-Abenteuer spielen
+              </Button>
+            </Link>
+          </div>
         </header>
 
         <main className="space-y-10">
