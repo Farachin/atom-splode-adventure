@@ -184,9 +184,9 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
         });
       }
       
-      // FIXED: Improve jet movement with thrust
+      // FIXED: Move jet based on thrust and direction
       if (jetThrust > 0) {
-        moveInDirection(playerRotation, jetThrust * deltaTime / 50); // Increased movement speed
+        moveJet(playerRotation, jetThrust, deltaTime);
         setJetThrust((prev) => Math.max(0, prev - deltaTime / 1000)); // Slower decay for thrust
       }
       
@@ -360,48 +360,69 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     onGameOver(Math.floor(score));
   };
   
-  // Spieler-Bewegung in eine bestimmte Richtung
-  const moveInDirection = (angle: number, distance: number) => {
+  // NEW FUNCTION: Improved jet movement function
+  const moveJet = (angle: number, speed: number, deltaTime: number) => {
     if (!isPlaying || !fieldRef.current) return;
     
-    // Berechne die X- und Y-Komponenten der Bewegung basierend auf dem Winkel
+    // Convert angle to radians for movement calculation
     const radians = angle * Math.PI / 180;
-    const deltaX = Math.cos(radians) * distance;
-    const deltaY = Math.sin(radians) * distance;
     
-    // Berechne die neue Position
+    // Calculate movement delta based on direction and speed
+    // Adjusted speed factor for more responsive movement
+    const movementFactor = 0.15; // Higher value = faster movement
+    const deltaX = Math.cos(radians) * speed * movementFactor;
+    const deltaY = Math.sin(radians) * speed * movementFactor;
+    
+    // Calculate new position
     const newX = playerPosition.x + deltaX;
     const newY = playerPosition.y + deltaY;
     
-    // Begrenze die Position innerhalb des Spielfelds
+    // Ensure position stays within boundaries (0-100%)
     const boundedX = Math.max(0, Math.min(100, newX));
     const boundedY = Math.max(0, Math.min(100, newY));
     
-    // Überprüfe Kollisionen mit Hindernissen
-    for (const obj of obstacles) {
-      if (obj.type === 'obstacle') {
-        const fieldWidth = fieldRef.current.clientWidth;
-        const fieldHeight = fieldRef.current.clientHeight;
-        
-        const playerX = boundedX / 100 * fieldWidth;
-        const playerY = boundedY / 100 * fieldHeight;
-        
-        // Wenn Kollision, dann Bewegung nicht erlauben
-        if (
-          playerX > obj.position.x - 15 && 
-          playerX < obj.position.x + obj.width + 15 &&
-          playerY > obj.position.y - 15 && 
-          playerY < obj.position.y + obj.height + 15
-        ) {
-          // Kollision: Reduziere Geschwindigkeit dramatisch
-          setJetThrust(0.1);
-          return;
+    // Check for collisions with obstacles
+    let collision = false;
+    if (fieldRef.current) {
+      const fieldWidth = fieldRef.current.clientWidth;
+      const fieldHeight = fieldRef.current.clientHeight;
+      
+      const playerX = boundedX / 100 * fieldWidth;
+      const playerY = boundedY / 100 * fieldHeight;
+      
+      for (const obj of obstacles) {
+        if (obj.type === 'obstacle') {
+          if (
+            playerX > obj.position.x - 15 && 
+            playerX < obj.position.x + obj.width + 15 &&
+            playerY > obj.position.y - 15 && 
+            playerY < obj.position.y + obj.height + 15
+          ) {
+            collision = true;
+            break;
+          }
         }
       }
     }
     
-    // FIXED: Actually update the player position
+    if (collision) {
+      // On collision, reduce thrust significantly but still allow some movement
+      setJetThrust(0.1);
+      return;
+    }
+    
+    // Update player position directly
     setPlayerPosition({ x: boundedX, y: boundedY });
+  };
+  
+  // Spieler-Bewegung in eine bestimmte Richtung
+  const moveInDirection = (angle: number, distance: number) => {
+    // Update player rotation
+    setPlayerRotation(angle);
+    
+    // Set thrust based on jet type
+    const jetSpeedFactor = jetType === 'metal' ? 1.5 : jetType === 'carbon' ? 1.2 : 1.0;
+    setJetThrust(Math.min(5, distance) * jetSpeedFactor);
   };
   
   // Mausklick/Touch auf dem Spielfeld
@@ -412,17 +433,18 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     const clickX = ((e.clientX - rect.left) / rect.width) * 100;
     const clickY = ((e.clientY - rect.top) / rect.height) * 100;
     
-    // Berechne den Winkel zum Zielpunkt
+    // Calculate angle to clicked point
     const dx = clickX - playerPosition.x;
     const dy = clickY - playerPosition.y;
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     
-    // Setze die Richtung des Jets
+    // Set rotation to face click direction
     setPlayerRotation(angle);
     
-    // Erhöhe den Schub - FIXED: Apply more thrust for better movement
+    // Apply thrust - increased for better response
     const jetSpeedFactor = jetType === 'metal' ? 1.5 : jetType === 'carbon' ? 1.2 : 1.0;
-    setJetThrust(Math.min(5, jetThrust + 2) * jetSpeedFactor);
+    // Higher initial thrust for more immediate movement
+    setJetThrust(Math.min(5, 3) * jetSpeedFactor);
   };
   
   // Tastatursteuerung
@@ -431,7 +453,7 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
       if (!isPlaying) return;
       
       const jetSpeedFactor = jetType === 'metal' ? 1.5 : jetType === 'carbon' ? 1.2 : 1.0;
-      const thrustIncrement = 1.0; // Increased for better movement
+      const thrustIncrement = 2.0; // Significantly increased for better movement response
       
       switch (e.key) {
         case 'ArrowUp':
@@ -450,8 +472,8 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
           setPlayerRotation(0);
           setJetThrust(Math.min(5, jetThrust + thrustIncrement) * jetSpeedFactor);
           break;
-        case ' ': // Leertaste für Boost
-          setJetThrust(Math.min(5, jetThrust + 2) * jetSpeedFactor);
+        case ' ': // Space bar for boost
+          setJetThrust(Math.min(5, jetThrust + 3) * jetSpeedFactor); // Stronger boost
           break;
       }
     };
@@ -574,14 +596,12 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
             </div>
             
             {/* Radar-Strahl */}
-            {/* FIXED: Improved radar beam visibility */}
             <div 
               className="absolute h-full w-3 bg-red-500 opacity-70"
               style={{ left: `${radarPosition.x}%` }}
             ></div>
             
             {/* Radar-Wellen - mehrere für bessere Sichtbarkeit */}
-            {/* FIXED: Improved radar wave visibility */}
             {[1, 2, 3].map((i) => (
               <div 
                 key={i}
@@ -642,10 +662,10 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
               </div>
             ))}
             
-            {/* Spieler-Jet - verbesserte Version mit besseren visuellen Effekten */}
+            {/* Spieler-Jet mit verbesserten visuellen Effekten */}
             <div 
               className={cn(
-                "absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-100",
+                "absolute transform transition-transform duration-100",
                 radarDetection && "ring-4 ring-red-500 ring-opacity-80"
               )}
               style={{ 
@@ -690,18 +710,16 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
               </div>
             </div>
             
-            {/* Klick-Hinweis */}
-            {isPlaying && (
-              <div className="absolute bottom-2 right-2 text-sm bg-white bg-opacity-80 p-2 rounded font-medium">
-                Klicke/tippe, um zu fliegen! Oder nutze die Pfeiltasten.
-              </div>
-            )}
+            {/* Klick-Hinweis mit verbesserten Anweisungen */}
+            <div className="absolute bottom-2 right-2 text-sm bg-white bg-opacity-80 p-2 rounded font-medium">
+              Klicke zum Fliegen! Oder nutze die Pfeiltasten ↑ → ↓ ←
+            </div>
           </div>
           
           {/* Steuerungshinweise */}
           <div className="text-sm text-center text-gray-600 bg-blue-50 p-2 rounded-md">
-            Steuere mit den Pfeiltasten oder klicke/tippe, wohin du fliegen willst. 
-            Leertaste für Schub-Boost!
+            <strong>STEUERUNG:</strong> Pfeiltasten für Richtung, 
+            Leertaste für Extra-Schub, oder einfach klicken/tippen!
           </div>
         </div>
       )}
