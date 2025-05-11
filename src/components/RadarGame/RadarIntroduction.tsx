@@ -66,12 +66,14 @@ const RadarIntroduction = ({ onComplete }: RadarIntroductionProps) => {
           <div className="absolute right-10 top-1/2 -translate-y-1/2">
             <div className="w-16 h-10 bg-gray-400 transform -rotate-12 rounded-md"></div>
           </div>
-          <style jsx>{`
-            @keyframes radarWave {
-              0% { transform: scale(0.1); opacity: 0.8; }
-              100% { transform: scale(3); opacity: 0; }
-            }
-          `}</style>
+          <style>
+            {`
+              @keyframes radarWave {
+                0% { transform: scale(0.1); opacity: 0.8; }
+                100% { transform: scale(3); opacity: 0; }
+              }
+            `}
+          </style>
         </div>
       );
     } else if (step === 2) {
