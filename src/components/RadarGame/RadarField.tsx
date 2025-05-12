@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { JetType } from './RadarGame';
@@ -46,6 +45,11 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
   const [showStartScreen, setShowStartScreen] = useState(true);
   const [isMoving, setIsMoving] = useState(false);
   const [lastMoveTimestamp, setLastMoveTimestamp] = useState(0);
+  
+  // Added keys state to track which keys are currently pressed
+  const [keysPressed, setKeysPressed] = useState<Record<string, boolean>>({});
+  // Ref to keep track of animation frame ID
+  const animationFrameRef = useRef<number | null>(null);
   
   // Initialisiere das Spielfeld
   useEffect(() => {
@@ -138,6 +142,86 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
       title: "Los geht's!",
       description: "Steuere deinen Jet mit den Pfeiltasten oder durch Klicken/Tippen.",
     });
+    
+    // Ensure we initialize movement
+    startMovementLoop();
+  };
+  
+  // COMPLETELY NEW: Create separate movement loop for smoother motion
+  const startMovementLoop = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    
+    const moveLoop = () => {
+      if (!isPlaying) return;
+      
+      // Handle player movement based on current direction and thrust
+      if (jetThrust > 0) {
+        const radians = playerRotation * Math.PI / 180;
+        
+        // Speed factor based on jet type
+        const jetSpeedFactor = jetType === 'metal' ? 0.5 : 
+                              jetType === 'carbon' ? 0.35 : 0.25;
+        
+        // Calculate movement
+        const moveX = Math.cos(radians) * jetThrust * jetSpeedFactor;
+        const moveY = Math.sin(radians) * jetThrust * jetSpeedFactor;
+        
+        // Update position with boundary checks
+        setPlayerPosition(prev => {
+          const newX = Math.max(0, Math.min(100, prev.x + moveX));
+          const newY = Math.max(0, Math.min(100, prev.y + moveY));
+          
+          // Check collision with obstacles
+          let collision = false;
+          if (fieldRef.current) {
+            const fieldWidth = fieldRef.current.clientWidth;
+            const fieldHeight = fieldRef.current.clientHeight;
+            
+            const playerAbsX = newX / 100 * fieldWidth;
+            const playerAbsY = newY / 100 * fieldHeight;
+            
+            obstacles.forEach(obj => {
+              if (obj.type === 'obstacle') {
+                const hitBox = 10; // Smaller hitbox for better playability
+                if (
+                  playerAbsX > obj.position.x - hitBox && 
+                  playerAbsX < obj.position.x + obj.width + hitBox &&
+                  playerAbsY > obj.position.y - hitBox && 
+                  playerAbsY < obj.position.y + obj.height + hitBox
+                ) {
+                  collision = true;
+                }
+              }
+            });
+          }
+          
+          if (collision) {
+            // Just return current position and reduce thrust on collision
+            setJetThrust(prev => prev * 0.5);
+            return prev;
+          }
+          
+          return { x: newX, y: newY };
+        });
+        
+        // Set moving flag for visual effects
+        setIsMoving(true);
+        setLastMoveTimestamp(Date.now());
+      } else if (isMoving && Date.now() - lastMoveTimestamp > 200) {
+        setIsMoving(false);
+      }
+      
+      // Gradually decrease thrust over time for natural deceleration
+      if (jetThrust > 0) {
+        setJetThrust(prev => Math.max(0, prev - 0.04)); // Slower deceleration for smoother movement
+      }
+      
+      animationFrameRef.current = requestAnimationFrame(moveLoop);
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(moveLoop);
   };
   
   // Spielloop
@@ -187,69 +271,13 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
         });
       }
       
-      // MAJOR FIX: Kontinuierliche Bewegung des Flugzeugs basierend auf Schub und Richtung
-      if (jetThrust > 0) {
-        // Konvertiere Winkel zu Radianten für die Bewegungsberechnung
-        const radians = playerRotation * Math.PI / 180;
-        
-        // Berechne die Bewegungsänderung basierend auf Richtung und Geschwindigkeit
-        // Erhöhter Bewegungsfaktor für besseres Ansprechverhalten
-        const movementFactor = 0.06; // Höherer Wert = schnellere Bewegung
-        const deltaX = Math.cos(radians) * jetThrust * movementFactor * deltaTime;
-        const deltaY = Math.sin(radians) * jetThrust * movementFactor * deltaTime;
-        
-        // Berechne neue Position
-        const newX = playerPosition.x + deltaX;
-        const newY = playerPosition.y + deltaY;
-        
-        // Stelle sicher, dass die Position innerhalb der Grenzen bleibt (0-100%)
-        const boundedX = Math.max(0, Math.min(100, newX));
-        const boundedY = Math.max(0, Math.min(100, newY));
-        
-        // Überprüfe auf Kollisionen mit Hindernissen
-        let collision = false;
-        if (fieldRef.current) {
-          const fieldWidth = fieldRef.current.clientWidth;
-          const fieldHeight = fieldRef.current.clientHeight;
-          
-          const playerX = boundedX / 100 * fieldWidth;
-          const playerY = boundedY / 100 * fieldHeight;
-          
-          for (const obj of obstacles) {
-            if (obj.type === 'obstacle') {
-              if (
-                playerX > obj.position.x - 15 && 
-                playerX < obj.position.x + obj.width + 15 &&
-                playerY > obj.position.y - 15 && 
-                playerY < obj.position.y + obj.height + 15
-              ) {
-                collision = true;
-                break;
-              }
-            }
-          }
-        }
-        
-        if (collision) {
-          // Bei Kollision den Schub erheblich reduzieren, aber trotzdem etwas Bewegung zulassen
-          setJetThrust(0.1);
-        } else {
-          // Aktualisiere die Position des Spielers direkt
-          setPlayerPosition({ x: boundedX, y: boundedY });
-          setIsMoving(true);
-          setLastMoveTimestamp(Date.now());
-        }
-      } else {
-        // Setze den Bewegungsstatus zurück, wenn nicht mehr aktiv bewegt wird
-        if (isMoving && Date.now() - lastMoveTimestamp > 200) {
-          setIsMoving(false);
-        }
-      }
-      
       gameLoopRef.current = requestAnimationFrame(loop);
     };
     
     gameLoopRef.current = requestAnimationFrame(loop);
+    
+    // Start the movement loop as well
+    startMovementLoop();
   };
   
   // Animiere die Radarwellen
@@ -385,6 +413,12 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
       gameLoopRef.current = null;
     }
     
+    // Make sure to cancel the movement animation frame too
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
     // Bonus für verbleibende Zeit
     const timeBonus = Math.floor(timeLeft * 10);
     const finalScore = Math.floor(score) + timeBonus;
@@ -402,9 +436,16 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     if (!isPlaying) return;
     
     setIsPlaying(false);
+    
+    // Cancel both animation frames
     if (gameLoopRef.current) {
       cancelAnimationFrame(gameLoopRef.current);
       gameLoopRef.current = null;
+    }
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
     
     toast({
@@ -416,7 +457,7 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     onGameOver(Math.floor(score));
   };
   
-  // Mausklick/Touch auf dem Spielfeld - VERBESSERT
+  // COMPLETELY REWRITTEN: Handling field click for proper movement
   const handleFieldClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isPlaying || !fieldRef.current) return;
     
@@ -429,69 +470,81 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
     const dy = clickY - playerPosition.y;
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     
-    // Setze die Rotation so, dass der Jet in Richtung des Klicks zeigt
+    // Rotate the jet to point to the direction
     setPlayerRotation(angle);
     
-    // Wende Schub an - erhöht für bessere Reaktion
-    const jetSpeedFactor = jetType === 'metal' ? 1.5 : jetType === 'carbon' ? 1.2 : 1.0;
-    // Höherer anfänglicher Schub für sofortigere Bewegung
-    setJetThrust(Math.min(5, 3) * jetSpeedFactor);
+    // Apply thrust based on jet type - stronger thrust for faster response
+    const jetSpeedBoost = jetType === 'metal' ? 5 : 
+                         jetType === 'carbon' ? 4 : 3;
     
-    // Flag setzen für aktive Bewegung
-    setIsMoving(true);
-    setLastMoveTimestamp(Date.now());
+    setJetThrust(jetSpeedBoost);
   };
   
-  // Tastatursteuerung - VERBESSERT
+  // Tastatursteuerung - COMPLETELY REWRITTEN
   useEffect(() => {
+    // Handle key press down
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPlaying) return;
       
-      const jetSpeedFactor = jetType === 'metal' ? 1.5 : jetType === 'carbon' ? 1.2 : 1.0;
-      const thrustIncrement = 2.0; // Deutlich erhöht für bessere Bewegungsreaktion
+      // Add key to pressed keys
+      setKeysPressed(prev => ({ ...prev, [e.key]: true }));
+      
+      // Get thrust setting based on jet type
+      const jetSpeedBoost = jetType === 'metal' ? 5 : 
+                           jetType === 'carbon' ? 4 : 3;
       
       switch (e.key) {
         case 'ArrowUp':
           setPlayerRotation(270);
-          setJetThrust(Math.min(5, jetThrust + thrustIncrement) * jetSpeedFactor);
-          setIsMoving(true);
-          setLastMoveTimestamp(Date.now());
+          setJetThrust(jetSpeedBoost);
           break;
         case 'ArrowDown':
           setPlayerRotation(90);
-          setJetThrust(Math.min(5, jetThrust + thrustIncrement) * jetSpeedFactor);
-          setIsMoving(true);
-          setLastMoveTimestamp(Date.now());
+          setJetThrust(jetSpeedBoost);
           break;
         case 'ArrowLeft':
           setPlayerRotation(180);
-          setJetThrust(Math.min(5, jetThrust + thrustIncrement) * jetSpeedFactor);
-          setIsMoving(true);
-          setLastMoveTimestamp(Date.now());
+          setJetThrust(jetSpeedBoost);
           break;
         case 'ArrowRight':
           setPlayerRotation(0);
-          setJetThrust(Math.min(5, jetThrust + thrustIncrement) * jetSpeedFactor);
-          setIsMoving(true);
-          setLastMoveTimestamp(Date.now());
+          setJetThrust(jetSpeedBoost);
           break;
-        case ' ': // Leertaste für Schub
-          setJetThrust(Math.min(5, jetThrust + 3) * jetSpeedFactor); // Stärkerer Schub
-          setIsMoving(true);
-          setLastMoveTimestamp(Date.now());
+        case ' ': // Leertaste für Extra-Schub
+          setJetThrust(prev => Math.min(prev + 2, 10));
           break;
       }
     };
     
+    // Handle key release
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!isPlaying) return;
+      
+      // Remove key from pressed keys
+      setKeysPressed(prev => {
+        const newKeys = { ...prev };
+        delete newKeys[e.key];
+        return newKeys;
+      });
+    };
+    
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlaying, jetThrust, jetType]);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isPlaying, jetType]);
   
   // Cleanup beim Unmount
   useEffect(() => {
     return () => {
       if (gameLoopRef.current) {
         cancelAnimationFrame(gameLoopRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
     };
   }, []);
@@ -735,4 +788,3 @@ const RadarField = ({ jetType, onGameOver }: RadarFieldProps) => {
 };
 
 export default RadarField;
-
